@@ -4,8 +4,12 @@
 #include "LcdDriver/Crystalfontz128x128_ST7735.h"
 #include <stdio.h>
 
+#include <stdint.h>
+
 /* Graphic library context */
 Graphics_Context g_sContext;
+
+extern Graphics_Image orso8BPP_UNCOMP;
 
 /* ADC results buffer */
 static uint16_t resultsBuffer[2];
@@ -62,12 +66,14 @@ void _graphicsInit() {
     GrContextFontSet(&g_sContext, &g_sFontFixed6x8);
     Graphics_clearDisplay(&g_sContext);
 
-    Graphics_drawStringCentered(&g_sContext,
-        (int8_t*)"Joystick:",
-        AUTO_STRING_LENGTH,
-        64,
-        30,
-        OPAQUE_TEXT);
+    // Graphics_drawStringCentered(&g_sContext,
+    //     (int8_t*)"Joystick:",
+    //     AUTO_STRING_LENGTH,
+    //     64,
+    //     30,
+    //     OPAQUE_TEXT);
+
+    Graphics_drawImage(&g_sContext, &orso8BPP_UNCOMP, 0, 0);
 
 }
 
@@ -103,6 +109,7 @@ int main(void) {
 
     while (1) {
         PCM_gotoLPM0();
+
     }
 }
 
@@ -117,39 +124,42 @@ void ADC14_IRQHandler(void) {
     ADC14_clearInterruptFlag(status);
 
     /* ADC_MEM1 conversion completed */
-    if (status & ADC_INT1) {
-        /* Store ADC14 conversion results */
-        resultsBuffer[0] = ADC14_getResult(ADC_MEM0);
-        resultsBuffer[1] = ADC14_getResult(ADC_MEM1);
+//     if (status & ADC_INT1) {
+//         /* Store ADC14 conversion results */
+//         resultsBuffer[0] = ADC14_getResult(ADC_MEM0);
+//         resultsBuffer[1] = ADC14_getResult(ADC_MEM1);
 
-        char string[10];
-        sprintf(string, "X: %5d", resultsBuffer[0]);
-        Graphics_drawStringCentered(&g_sContext,
-            (int8_t*)string,
-            8,
-            64,
-            50,
-            OPAQUE_TEXT);
+//         char string[10];
+//         sprintf(string, "X: %5d", resultsBuffer[0]);
+//         Graphics_drawStringCentered(&g_sContext,
+//             (int8_t*)string,
+//             8,
+//             64,
+//             50,
+//             OPAQUE_TEXT);
 
-        sprintf(string, "Y: %5d", resultsBuffer[1]);
-        Graphics_drawStringCentered(&g_sContext,
-            (int8_t*)string,
-            8,
-            64,
-            70,
-            OPAQUE_TEXT);
+//         sprintf(string, "Y: %5d", resultsBuffer[1]);
+//         Graphics_drawStringCentered(&g_sContext,
+//             (int8_t*)string,
+//             8,
+//             64,
+//             70,
+//             OPAQUE_TEXT);
 
-/* Determine if JoyStick button is pressed */
-        int buttonPressed = 0;
-        if (!(P4IN & GPIO_PIN1))
-            buttonPressed = 1;
+// /* Determine if JoyStick button is pressed */
+//         int buttonPressed = 0;
+//         if (!(P4IN & GPIO_PIN1))
+//             buttonPressed = 1;
 
-        sprintf(string, "Button: %d", buttonPressed);
-        Graphics_drawStringCentered(&g_sContext,
-            (int8_t*)string,
-            AUTO_STRING_LENGTH,
-            64,
-            90,
-            OPAQUE_TEXT);
-    }
+//         sprintf(string, "Button: %d", buttonPressed);
+//         Graphics_drawStringCentered(&g_sContext,
+//             (int8_t*)string,
+//             AUTO_STRING_LENGTH,
+//             64,
+//             90,
+//             OPAQUE_TEXT);
+//     }
 }
+
+
+// load image
