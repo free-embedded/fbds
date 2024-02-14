@@ -6,13 +6,15 @@ include $(SIMPLELINK_MSP432_SDK_INSTALL_DIR)/imports.mak
 CC = "$(GCC_ARMCOMPILER)/bin/arm-none-eabi-gcc"
 LNK = "$(GCC_ARMCOMPILER)/bin/arm-none-eabi-gcc"
 
-OBJECTS = ./target/main.obj ./target/system_msp432p401r.obj ./target/gcc_startup_msp432p401r_gcc.obj
+OBJECTS = ./target/main.obj ./target/system_msp432p401r.obj ./target/gcc_startup_msp432p401r_gcc.obj \
+          ./target/Crystalfontz128x128_ST7735.obj ./target/HAL_MSP_EXP432P401R_Crystalfontz128x128_ST7735.obj
 
 NAME = ./out/fbds.out
 
 CFLAGS = -I.. \
     "-I$(SIMPLELINK_MSP432_SDK_INSTALL_DIR)/source" \
     "-I$(SIMPLELINK_MSP432_SDK_INSTALL_DIR)/source/third_party/CMSIS/Include" \
+    "-I./LcdDriver" \
     -D__MSP432P401R__ \
     -DDeviceFamily_MSP432P401x \
     -mcpu=cortex-m4 \
@@ -52,6 +54,16 @@ LFLAGS = -Wl,-T,./build/msp432p401r.lds \
     --specs=nano.specs
 
 all: $(NAME).out
+
+./target/Crystalfontz128x128_ST7735.obj: ./src/LcdDriver/Crystalfontz128x128_ST7735.c
+	$(DIR_GUARD) # Ensure this line starts with a tab, not spaces
+	@ echo Building $@
+	@ $(CC) $(CFLAGS) $< -c -o $@
+
+./target/HAL_MSP_EXP432P401R_Crystalfontz128x128_ST7735.obj: ./src/LcdDriver/HAL_MSP_EXP432P401R_Crystalfontz128x128_ST7735.c
+	$(DIR_GUARD)
+	@ echo Building $@
+	@ $(CC) $(CFLAGS) $< -c -o $@
 
 ./target/main.obj: ./src/main.c
 	$(DIR_GUARD)
