@@ -9,7 +9,7 @@ LNK = "$(GCC_ARMCOMPILER)/bin/arm-none-eabi-gcc"
 OBJECTS = ./target/main.obj ./target/system_msp432p401r.obj ./target/gcc_startup_msp432p401r_gcc.obj \
           ./target/Crystalfontz128x128_ST7735.obj ./target/HAL_MSP_EXP432P401R_Crystalfontz128x128_ST7735.obj
 
-NAME = ./out/fbds.out
+NAME = ./out/fbds
 
 CFLAGS = -I.. \
     "-I$(SIMPLELINK_MSP432_SDK_INSTALL_DIR)/source" \
