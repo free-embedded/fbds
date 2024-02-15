@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include "notes.h"
+#include <timer_a.h>
 
 const uint16_t joystick_max_value = 16362; // should be 16384
 
@@ -45,12 +46,12 @@ void _buzzerInit() {
     GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN7,
         GPIO_PRIMARY_MODULE_FUNCTION);
 
-    // /* Configuring Timer_A0 for Up Mode and starting */
-    // Timer_A_configureUpMode(TIMER_A0_BASE, &upConfig);
-    // Timer_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);
+    /* Configuring Timer_A0 for Up Mode and starting */
+    Timer_A_configureUpMode(TIMER_A0_BASE, &upConfig);
+    Timer_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);
 
     /* Initialize compare registers to generate PWM */
-    //Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.7
+    Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.7
 }
 
 void _adcInit() {
@@ -105,15 +106,7 @@ void _graphicsInit() {
     GrContextFontSet(&g_sContext, &g_sFontFixed6x8);
     Graphics_clearDisplay(&g_sContext);
 
-    // Graphics_drawStringCentered(&g_sContext,
-    //     (int8_t*)"Joystick:",
-    //     AUTO_STRING_LENGTH,
-    //     64,
-    //     30,
-    //     OPAQUE_TEXT);
-
     Graphics_drawImage(&g_sContext, &orso8BPP_UNCOMP, 0, 0);
-
 }
 
 void _hwInit() {
@@ -212,38 +205,7 @@ void ADC14_IRQHandler(void) {
             Graphics_drawCircle(&g_sContext, x_offset, y_offset, 16);
 
         }
-
-
-        // sprintf(string, "X: %5d", resultsBuffer[0]);
-        // Graphics_drawStringCentered(&g_sContext,
-        //     (int8_t*)string,
-        //     8,
-        //     64,
-        //     50,
-        //     OPAQUE_TEXT);
-
-        // sprintf(string, "Y: %5d", resultsBuffer[1]);
-        // Graphics_drawStringCentered(&g_sContext,
-        //     (int8_t*)string,
-        //     8,
-        //     64,
-        //     70,
-        //     OPAQUE_TEXT);
     }
-
-// /* Determine if JoyStick button is pressed */
-//         int buttonPressed = 0;
-//         if (!(P4IN & GPIO_PIN1))
-//             buttonPressed = 1;
-
-//         sprintf(string, "Button: %d", buttonPressed);
-//         Graphics_drawStringCentered(&g_sContext,
-//             (int8_t*)string,
-//             AUTO_STRING_LENGTH,
-//             64,
-//             90,
-//             OPAQUE_TEXT);
-//     }
 }
 
 
