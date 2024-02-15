@@ -13,13 +13,16 @@ static uint16_t resultsBuffer[2];
 #define map(x, in_min, in_max, out_min, out_max) \
     ((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
+#define SERVO1_MAX 410
+#define SERVO1_MIN 375
+
 
 /* Timer_A Compare Configuration Parameter  (PWM) */
 Timer_A_CompareModeConfig compareConfig_PWM = {
-    TIMER_A_CAPTURECOMPARE_REGISTER_3,        // Use CCR3
+    TIMER_A_CAPTURECOMPARE_REGISTER_2,        // Use CCR3
     TIMER_A_CAPTURECOMPARE_INTERRUPT_DISABLE, // Disable CCR interrupt
     TIMER_A_OUTPUTMODE_RESET_SET,             // Toggle output but
-    375                                       // 1.5 ms pulse width
+    SERVO1_MIN                                       // 1.5 ms pulse width
 };
 
 /* Timer_A Up Configuration Parameter */
@@ -34,16 +37,28 @@ const Timer_A_UpModeConfig upConfig = {
 
 void _servoInit()
 {
+    // Configures P2.5 to PM_TA0.2 for using Timer PWM to control Servo1
+    // GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN5, GPIO_PRIMARY_MODULE_FUNCTION);
+
+
+
     // Configures P2.6 to PM_TA0.3 for using Timer PWM to control Servo1
-    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN6,
-                                                GPIO_PRIMARY_MODULE_FUNCTION);
+    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN6, GPIO_PRIMARY_MODULE_FUNCTION);
 
     // Configuring Timer_A0 for Up Mode and starting
     Timer_A_configureUpMode(TIMER_A0_BASE, &upConfig);
     Timer_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);
 
     // Initialize compare registers to generate PWM  for the Servo1 Port
+    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3;
     Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.6
+
+
+
+
+    // // Initialize compare registers to generate PWM  for the Servo1 Port 2.5
+    // compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_2;
+    // Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.5
 
 }
 
