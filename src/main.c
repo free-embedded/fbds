@@ -14,8 +14,8 @@ static uint16_t resultsBuffer[2];
     ((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
 #define SERVO1_MAX 1800
-#define SERVO1_MIN 750
-#define SERVO1_MID 1275
+#define SERVO1_MIN 450
+#define SERVO1_MID 1100
 
 #define SERVO1_MOVE 10
 
@@ -189,15 +189,15 @@ void ADC14_IRQHandler(void)
                                     30,
                                     OPAQUE_TEXT);
 
-        if (resultsBuffer[0] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD && servo1Position < SERVO1_MAX)
+        if (resultsBuffer[0] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD && servo1Position > SERVO1_MIN)
         {
-            servo1Position = servo1Position + SERVO1_MOVE;
+            servo1Position = servo1Position - SERVO1_MOVE;
             compareConfig_PWM.compareValue = servo1Position;
             Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
         }
-        else if (resultsBuffer[0] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD && servo1Position > SERVO1_MIN)
+        else if (resultsBuffer[0] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD && servo1Position < SERVO1_MAX)
         {
-            servo1Position = servo1Position - SERVO1_MOVE;
+            servo1Position = servo1Position + SERVO1_MOVE;
             compareConfig_PWM.compareValue = servo1Position;
             Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
         }
@@ -226,7 +226,6 @@ void ADC14_IRQHandler(void)
         if (!(P4IN & GPIO_PIN1))
         {
             buttonPressed = 1;
-            Timer_A_stopTimer(TIMER_A0_BASE);
         }
 
         sprintf(string, "Button: %d", buttonPressed);
