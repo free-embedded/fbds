@@ -13,23 +13,31 @@ static uint16_t resultsBuffer[2];
 #define map(x, in_min, in_max, out_min, out_max) \
     ((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
-#define SERVO1_MAX 410
-#define SERVO1_MIN 375
+#define SERVO1_MAX 1800
+#define SERVO1_MIN 750
+#define SERVO1_MID 1275
 
+#define SERVO1_MOVE 10
+
+int servo1Position = SERVO1_MID;
+
+
+#define JOYSTICK_TRESHOLD 4000
+#define JOYSTICK_CENTER 8192
 
 /* Timer_A Compare Configuration Parameter  (PWM) */
 Timer_A_CompareModeConfig compareConfig_PWM = {
-    TIMER_A_CAPTURECOMPARE_REGISTER_2,        // Use CCR3
+    TIMER_A_CAPTURECOMPARE_REGISTER_2,        // Use CCR2
     TIMER_A_CAPTURECOMPARE_INTERRUPT_DISABLE, // Disable CCR interrupt
     TIMER_A_OUTPUTMODE_RESET_SET,             // Toggle output but
-    SERVO1_MIN                                       // 1.5 ms pulse width
+    SERVO1_MID                                // 1.5 ms pulse width
 };
 
 /* Timer_A Up Configuration Parameter */
 const Timer_A_UpModeConfig upConfig = {
-    TIMER_A_CLOCKSOURCE_SMCLK,           // SMCLK = 3 MhZ
-    TIMER_A_CLOCKSOURCE_DIVIDER_12,      // SMCLK/12 = 250 KhZ
-    5000,                                // 20 ms tick period
+    TIMER_A_CLOCKSOURCE_SMCLK,           // SMCLK = 48 MhZ
+    TIMER_A_CLOCKSOURCE_DIVIDER_64,      // SMCLK/64 = 750 KhZ
+    15000,                               // 0.02 s * 750 KhZ = 15000 tick period
     TIMER_A_TAIE_INTERRUPT_DISABLE,      // Disable Timer interrupt
     TIMER_A_CCIE_CCR0_INTERRUPT_DISABLE, // Disable CCR0 interrupt
     TIMER_A_DO_CLEAR                     // Clear value
@@ -39,8 +47,6 @@ void _servoInit()
 {
     // Configures P2.5 to PM_TA0.2 for using Timer PWM to control Servo1
     // GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN5, GPIO_PRIMARY_MODULE_FUNCTION);
-
-
 
     // Configures P2.6 to PM_TA0.3 for using Timer PWM to control Servo1
     GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN6, GPIO_PRIMARY_MODULE_FUNCTION);
@@ -53,13 +59,9 @@ void _servoInit()
     compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3;
     Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.6
 
-
-
-
     // // Initialize compare registers to generate PWM  for the Servo1 Port 2.5
     // compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_2;
     // Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.5
-
 }
 
 void _adcInit()
@@ -116,12 +118,6 @@ void _graphicsInit()
     GrContextFontSet(&g_sContext, &g_sFontFixed6x8);
     Graphics_clearDisplay(&g_sContext);
 
-    Graphics_drawStringCentered(&g_sContext,
-                                (int8_t *)"Joystick:",
-                                AUTO_STRING_LENGTH,
-                                64,
-                                30,
-                                OPAQUE_TEXT);
 }
 
 void _hwInit()
@@ -149,6 +145,9 @@ void _hwInit()
     _servoInit();
 }
 
+
+char debugPrintString[20];
+
 /*
  * Main function
  */
@@ -161,6 +160,7 @@ int main(void)
         PCM_gotoLPM0();
     }
 }
+
 
 /* This interrupt is fired whenever a conversion is completed and placed in
  * ADC_MEM1. This signals the end of conversion and the results array is
@@ -178,6 +178,31 @@ void ADC14_IRQHandler(void)
         /* Store ADC14 conversion results */
         resultsBuffer[0] = ADC14_getResult(ADC_MEM0);
         resultsBuffer[1] = ADC14_getResult(ADC_MEM1);
+
+        sprintf(debugPrintString, "Servo: %d", servo1Position);
+
+
+        Graphics_drawStringCentered(&g_sContext,
+                                    debugPrintString,
+                                    AUTO_STRING_LENGTH,
+                                    64,
+                                    30,
+                                    OPAQUE_TEXT);
+
+        if (resultsBuffer[0] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD && servo1Position < SERVO1_MAX)
+        {
+            servo1Position = servo1Position + SERVO1_MOVE;
+            compareConfig_PWM.compareValue = servo1Position;
+            Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+        }
+        else if (resultsBuffer[0] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD && servo1Position > SERVO1_MIN)
+        {
+            servo1Position = servo1Position - SERVO1_MOVE;
+            compareConfig_PWM.compareValue = servo1Position;
+            Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+        }
+
+
 
         char string[10];
         sprintf(string, "X: %5d", resultsBuffer[0]);
