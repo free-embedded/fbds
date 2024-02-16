@@ -6,17 +6,17 @@
 
 #include <stdint.h>
 #include "notes.h"
+#include "song.h"
+#include "player.h"
 
 // Define SMCLK frequency if not already defined
 #ifndef SMCLK_FREQUENCY
 #define SMCLK_FREQUENCY 48000000 // 48 MHz
 #endif
 
+extern Song hedwigsTheme; // Declare external reference to the song defined elsewhere
 
 const uint16_t joystick_max_value = 16362; // should be 16384
-
-/* Graphic library context */
-Graphics_Context g_sContext;
 
 extern Graphics_Image orso8BPP_UNCOMP;
 
@@ -24,61 +24,9 @@ extern Graphics_Image orso8BPP_UNCOMP;
 static uint16_t resultsBuffer[2];
 static uint16_t previusResultsBuffer[2];
 
+/* Graphic library  context */
+Graphics_Context g_sContext;
 
-/* Timer_A Compare Configuration Parameter  (PWM) */
-Timer_A_CompareModeConfig compareConfig_PWM = {
-        TIMER_A_CAPTURECOMPARE_REGISTER_4,          // Use CCR4
-        TIMER_A_CAPTURECOMPARE_INTERRUPT_DISABLE,   // Disable CCR interrupt
-        TIMER_A_OUTPUTMODE_TOGGLE_SET,              // Toggle output but
-        0                                        // 25% Duty Cycle initially
-};
-
-// /* Timer_A Up Configuration Parameter */
-// const Timer_A_UpModeConfig upConfig = {
-//         TIMER_A_CLOCKSOURCE_SMCLK,               // SMCLK = 3 MhZ
-//         TIMER_A_CLOCKSOURCE_DIVIDER_12,         // SMCLK/12 = 250 KhZ
-//         20000,                                  // 40 ms tick period
-//         TIMER_A_TAIE_INTERRUPT_DISABLE,         // Disable Timer interrupt
-//         TIMER_A_CCIE_CCR0_INTERRUPT_DISABLE,    // Disable CCR0 interrupt
-//         TIMER_A_DO_CLEAR                        // Clear value
-// };
-
-
-void _buzzerInit() {
-
-    // Configure GPIO pin for PWM output (P2.7 associated with TA0.4)
-    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN7, GPIO_PRIMARY_MODULE_FUNCTION);
-
-    // Stop the timer during configuration
-    Timer_A_stopTimer(TIMER_A0_BASE);
-
-    // Timer_A PWM Configuration
-    Timer_A_PWMConfig pwmConfig = {
-        TIMER_A_CLOCKSOURCE_SMCLK,               // Use SMCLK as source
-        TIMER_A_CLOCKSOURCE_DIVIDER_1,           // Divider: 1
-        0,                                       // Period will be set by playFrequency
-        TIMER_A_CAPTURECOMPARE_REGISTER_4,       // Use CCR4 for PWM channel
-        TIMER_A_OUTPUTMODE_RESET_SET,            // PWM output mode: reset/set
-        0                                        // Duty cycle will be set by playFrequency
-    };
-
-    // Initialize PWM output (but don't start it yet)
-    Timer_A_generatePWM(TIMER_A0_BASE, &pwmConfig);
-
-
-
-
-    /* Configures P2.7 to PM_TA0.4 for using Timer PWM to control the buzzer */
-    // GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN7,
-        // GPIO_PRIMARY_MODULE_FUNCTION);
-
-    /* Configuring Timer_A0 for Up Mode and starting */
-    // Timer_A_configureUpMode(TIMER_A0_BASE, &upConfig);
-    // Timer_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);
-
-    /* Initialize compare registers to generate PWM */
-    //Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.7
-}
 
 void _adcInit() {
     /* Configures Pin 6.0 and 4.4 as ADC input */
@@ -156,10 +104,8 @@ void _hwInit() {
 
     _graphicsInit();
     _adcInit();
-    _buzzerInit();
+    _toneInit();
 }
-
-
 
 uint16_t map_value(uint16_t value, uint16_t from_min, uint16_t from_max, uint16_t to_min, uint16_t to_max) {
     return (value - from_min) * (to_max - to_min) / (from_max - from_min) + to_min;
@@ -169,45 +115,16 @@ uint16_t percent_delta(uint16_t value, uint16_t previus_value) {
     return (value - previus_value) * 100 / joystick_max_value;
 }
 
+int sos = 69;
+char str[10];
 
-
-void playFrequency(uint32_t frequency, uint32_t durationMs) {
-    uint32_t period = SMCLK_FREQUENCY / frequency;
-    uint32_t dutyCycle = period / 2; // 50% duty cycle for square wave
-
-    // Update PWM period for desired frequency
-    Timer_A_PWMConfig pwmConfig = {
-        TIMER_A_CLOCKSOURCE_SMCLK,
-        TIMER_A_CLOCKSOURCE_DIVIDER_1,
-        period,
-        TIMER_A_CAPTURECOMPARE_REGISTER_4,
-        TIMER_A_OUTPUTMODE_RESET_SET,
-        dutyCycle
-    };
-    Timer_A_generatePWM(TIMER_A0_BASE, &pwmConfig);
-
-    // Delay for the duration of the note
-    __delay_cycles((SMCLK_FREQUENCY / 1000) * durationMs);
-
-    // Stop PWM to silence the buzzer
-    Timer_A_stopTimer(TIMER_A0_BASE);
-}
 
 int main(void) {
     _hwInit();
+    sos = play_song(hedwigsTheme);
 
 
-    while (1) {
-        playFrequency(NOTE_C4, 500);
-        playFrequency(NOTE_D4, 500);
-        playFrequency(NOTE_E4, 500);
-        playFrequency(NOTE_F4, 500);
-        playFrequency(NOTE_G4, 500);
-        playFrequency(NOTE_A4, 500);
-        playFrequency(NOTE_B4, 500);
-        playFrequency(NOTE_C5, 500);
-        playFrequency(NOTE_C4, 500);
-    }
+    // print sos on display
 }
 
 
@@ -256,6 +173,12 @@ void ADC14_IRQHandler(void) {
             // draw circle
             Graphics_drawCircle(&g_sContext, x_offset, y_offset, 15);
             Graphics_drawCircle(&g_sContext, x_offset, y_offset, 16);
+
+
+            sprintf(str, "%d", sos);
+
+            Graphics_drawStringCentered(&g_sContext, str, AUTO_STRING_LENGTH, 64, 64, TRANSPARENT_TEXT);
+
 
         }
     }
