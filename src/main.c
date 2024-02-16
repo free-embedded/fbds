@@ -121,10 +121,7 @@ char str[10];
 
 int main(void) {
     _hwInit();
-    sos = play_song(hedwigsTheme);
-
-
-    // print sos on display
+    play_song(hedwigsTheme);
 }
 
 
@@ -173,13 +170,6 @@ void ADC14_IRQHandler(void) {
             // draw circle
             Graphics_drawCircle(&g_sContext, x_offset, y_offset, 15);
             Graphics_drawCircle(&g_sContext, x_offset, y_offset, 16);
-
-
-            sprintf(str, "%d", sos);
-
-            Graphics_drawStringCentered(&g_sContext, str, AUTO_STRING_LENGTH, 64, 64, TRANSPARENT_TEXT);
-
-
         }
     }
 }

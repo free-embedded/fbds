@@ -67,7 +67,7 @@ void delay(int time) {
     for (i = 0;i < 200 * ADAPT_TO_48MHZ * time;++i);
 }
 
-int play_song(Song song) {
+void play_song(Song song) {
 
     // sizeof gives the number of bytes, each int value is composed of two bytes (ADAPT_TO_48MHZ bits)
     // there are two values per note (pitch and duration), so for each note there are four bytes
@@ -108,5 +108,4 @@ int play_song(Song song) {
         // Wait for the specief duration before playing the next note.
         delay(noteDuration * 0.1);
     }
-    return thisNote;
 }
