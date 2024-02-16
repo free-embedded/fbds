@@ -66,3 +66,5 @@ dkms.conf
 
 # Vscode intellisense
 settings.json
+
+examples/*
