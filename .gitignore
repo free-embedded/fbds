@@ -1,3 +1,7 @@
+# ifgnore venv files and folders
+pyvenv.cfg
+venv
+
 # MacOS
 .DS_store
 
