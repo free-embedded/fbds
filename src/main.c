@@ -221,19 +221,34 @@ void ADC14_IRQHandler(void)
                                     70,
                                     OPAQUE_TEXT);
 
-        // Determine if JoyStick button is pressed
-        int buttonPressed = 0;
-        if (!(P4IN & GPIO_PIN1))
+        // Determine if JoyStick top button is pressed
+        int topButtonPressed = 0;
+        if (!(P5IN & GPIO_PIN1))
         {
-            buttonPressed = 1;
+        	topButtonPressed = 1;
         }
-
-        sprintf(string, "Button: %d", buttonPressed);
+        
+        sprintf(string, "Button: %d", topButtonPressed);
         Graphics_drawStringCentered(&g_sContext,
-                                    (int8_t *)string,
-                                    AUTO_STRING_LENGTH,
-                                    64,
-                                    90,
-                                    OPAQUE_TEXT);
-    }
+        	(int8_t *)string,
+        	AUTO_STRING_LENGTH,
+        	64,
+        	90,
+        	OPAQUE_TEXT);
+        
+        // Determine if JoyStick bottom button is pressed
+        int bottomButtonPressed = 0;
+        if (!(P3IN & GPIO_PIN5))
+        {
+        	bottomButtonPressed = 1;
+        }
+        
+        sprintf(string, "Button: %d", bottomButtonPressed);
+        Graphics_drawStringCentered(&g_sContext,
+        	(int8_t *)string,
+        	AUTO_STRING_LENGTH,
+        	64,
+        	110,
+        	OPAQUE_TEXT);
+            }
 }
