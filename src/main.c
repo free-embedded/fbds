@@ -17,7 +17,7 @@ static uint16_t resultsBuffer[2];
 #define SERVO1_MIN 450
 #define SERVO1_MID 1100
 
-#define SERVO1_MOVE 10
+#define SERVO1_MOVE 50
 
 int servo1Position = SERVO1_MID;
 
