@@ -228,7 +228,7 @@ void ADC14_IRQHandler(void)
         	topButtonPressed = 1;
         }
         
-        sprintf(string, "Button: %d", topButtonPressed);
+        sprintf(string, "Top Button: %d", topButtonPressed);
         Graphics_drawStringCentered(&g_sContext,
         	(int8_t *)string,
         	AUTO_STRING_LENGTH,
@@ -243,7 +243,7 @@ void ADC14_IRQHandler(void)
         	bottomButtonPressed = 1;
         }
         
-        sprintf(string, "Button: %d", bottomButtonPressed);
+        sprintf(string, "Bottom Button: %d", bottomButtonPressed);
         Graphics_drawStringCentered(&g_sContext,
         	(int8_t *)string,
         	AUTO_STRING_LENGTH,
