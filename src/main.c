@@ -13,22 +13,32 @@ static uint16_t resultsBuffer[2];
 #define map(x, in_min, in_max, out_min, out_max) \
     ((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
+// SERVO1 (HORIZONTAL) 2.4
 #define SERVO1_MAX 1800
 #define SERVO1_MIN 450
 #define SERVO1_MID 1100
 
-#define SERVO1_MOVE 50
+#define SERVO1_MOVE 100
 
 int servo1Position = SERVO1_MID;
 
+// SERVO2 (VERTICAL) 2.6
+// SERVO3 (TRIGGER) 2.5
+#define SERVOC_UP 1000
+#define SERVOC_STOP 1150
+#define SERVOC_DOWN 1200
+
+int servo2Direction = SERVOC_STOP;
+int servo3Direction = SERVOC_STOP;
+
 int turretAutomaticMode = false;
 
-#define JOYSTICK_TRESHOLD 4000
+#define JOYSTICK_TRESHOLD 2500
 #define JOYSTICK_CENTER 8192
 
 /* Timer_A Compare Configuration Parameter  (PWM) */
 Timer_A_CompareModeConfig compareConfig_PWM = {
-    TIMER_A_CAPTURECOMPARE_REGISTER_1,        // Use CCR2
+    TIMER_A_CAPTURECOMPARE_REGISTER_1,        // Use CCR1
     TIMER_A_CAPTURECOMPARE_INTERRUPT_DISABLE, // Disable CCR interrupt
     TIMER_A_OUTPUTMODE_RESET_SET,             // Toggle output but
     SERVO1_MID                                // 1.5 ms pulse width
@@ -47,9 +57,9 @@ const Timer_A_UpModeConfig upConfig = {
 void _servoInit()
 {
     // Configures P2.5 to PM_TA0.2 for using Timer PWM to control Servo1
-    // GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN5, GPIO_PRIMARY_MODULE_FUNCTION);
+    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN5, GPIO_PRIMARY_MODULE_FUNCTION);
 
-    // Configures P2.6 to PM_TA0.3 for using Timer PWM to control Servo1
+    // Configures P2.4 to PM_TA0.1 for using Timer PWM to control Servo1
     GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN4, GPIO_PRIMARY_MODULE_FUNCTION);
 
     // Configuring Timer_A0 for Up Mode and starting
@@ -58,11 +68,13 @@ void _servoInit()
 
     // Initialize compare registers to generate PWM  for the Servo1 Port
     compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_1;
-    Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.6
+    compareConfig_PWM.compareValue = SERVOC_STOP;
+    Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.4
 
-    // // Initialize compare registers to generate PWM  for the Servo1 Port 2.5
-    // compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_2;
-    // Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.5
+    // // Initialize compare registers to generate PWM  for the Servo2 Port 2.5
+    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_2;
+    compareConfig_PWM.compareValue = SERVO1_MID;
+    Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.5
 }
 
 void _adcInit()
@@ -118,7 +130,6 @@ void _graphicsInit()
     Graphics_setBackgroundColor(&g_sContext, GRAPHICS_COLOR_WHITE);
     GrContextFontSet(&g_sContext, &g_sFontFixed6x8);
     Graphics_clearDisplay(&g_sContext);
-
 }
 
 void _hwInit()
@@ -146,7 +157,6 @@ void _hwInit()
     _servoInit();
 }
 
-
 char debugPrintString[20];
 
 /*
@@ -161,7 +171,6 @@ int main(void)
         PCM_gotoLPM0();
     }
 }
-
 
 /* This interrupt is fired whenever a conversion is completed and placed in
  * ADC_MEM1. This signals the end of conversion and the results array is
@@ -180,8 +189,39 @@ void ADC14_IRQHandler(void)
         resultsBuffer[0] = ADC14_getResult(ADC_MEM0);
         resultsBuffer[1] = ADC14_getResult(ADC_MEM1);
 
-        sprintf(debugPrintString, "Servo: %d", servo1Position);
+        
 
+        if (!turretAutomaticMode)
+        {
+            if (resultsBuffer[1] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD && servo1Position > SERVO1_MIN)
+            {
+                servo1Position = servo1Position - SERVO1_MOVE;
+            }
+            else if (resultsBuffer[1] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD && servo1Position < SERVO1_MAX)
+            {
+                servo1Position = servo1Position + SERVO1_MOVE;
+            }
+            compareConfig_PWM.compareValue = servo1Position;
+            compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_2;
+            Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+            if (resultsBuffer[1] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD)
+            {
+                servo2Direction = SERVOC_DOWN;
+            }
+            else if (resultsBuffer[1] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD)
+            {
+                servo2Direction = SERVOC_UP;
+            }
+            else {
+                servo2Direction = SERVOC_STOP;
+            }
+            // compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_2;
+            compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_1;
+            compareConfig_PWM.compareValue = servo2Direction;
+            Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+        }
+
+        sprintf(debugPrintString, "Servo1: %d", servo1Position);
 
         Graphics_drawStringCentered(&g_sContext,
                                     debugPrintString,
@@ -189,20 +229,6 @@ void ADC14_IRQHandler(void)
                                     64,
                                     30,
                                     OPAQUE_TEXT);
-
-        if (!turretAutomaticMode)
-        {
-        	if (resultsBuffer[0] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD && servo1Position > SERVO1_MIN)
-        	{
-        		servo1Position = servo1Position - SERVO1_MOVE;
-        	}
-        	else if (resultsBuffer[0] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD && servo1Position < SERVO1_MAX)
-        	{
-        		servo1Position = servo1Position + SERVO1_MOVE;
-        	}
-        	compareConfig_PWM.compareValue = servo1Position;
-        	Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
-        }
 
         char string[10];
         sprintf(string, "X: %5d", resultsBuffer[0]);
@@ -225,30 +251,30 @@ void ADC14_IRQHandler(void)
         int topButtonPressed = 0;
         if (!(P5IN & GPIO_PIN1))
         {
-        	topButtonPressed = 1;
+            topButtonPressed = 1;
         }
-        
+
         sprintf(string, "Top Button: %d", topButtonPressed);
         Graphics_drawStringCentered(&g_sContext,
-        	(int8_t *)string,
-        	AUTO_STRING_LENGTH,
-        	64,
-        	90,
-        	OPAQUE_TEXT);
-        
+                                    (int8_t *)string,
+                                    AUTO_STRING_LENGTH,
+                                    64,
+                                    90,
+                                    OPAQUE_TEXT);
+
         // Determine if JoyStick bottom button is pressed
         int bottomButtonPressed = 0;
         if (!(P3IN & GPIO_PIN5))
         {
-        	bottomButtonPressed = 1;
+            bottomButtonPressed = 1;
         }
-        
+
         sprintf(string, "Bottom Button: %d", bottomButtonPressed);
         Graphics_drawStringCentered(&g_sContext,
-        	(int8_t *)string,
-        	AUTO_STRING_LENGTH,
-        	64,
-        	110,
-        	OPAQUE_TEXT);
-            }
+                                    (int8_t *)string,
+                                    AUTO_STRING_LENGTH,
+                                    64,
+                                    110,
+                                    OPAQUE_TEXT);
+    }
 }
