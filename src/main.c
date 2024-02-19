@@ -21,6 +21,7 @@ static uint16_t resultsBuffer[2];
 
 int servo1Position = SERVO1_MID;
 
+int turretAutomaticMode = false;
 
 #define JOYSTICK_TRESHOLD 4000
 #define JOYSTICK_CENTER 8192
@@ -189,16 +190,19 @@ void ADC14_IRQHandler(void)
                                     30,
                                     OPAQUE_TEXT);
 
-        if (resultsBuffer[0] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD && servo1Position > SERVO1_MIN)
+        if (!turretAutomaticMode)
         {
-            servo1Position = servo1Position - SERVO1_MOVE;
+        	if (resultsBuffer[0] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD && servo1Position > SERVO1_MIN)
+        	{
+        		servo1Position = servo1Position - SERVO1_MOVE;
+        	}
+        	else if (resultsBuffer[0] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD && servo1Position < SERVO1_MAX)
+        	{
+        		servo1Position = servo1Position + SERVO1_MOVE;
+        	}
+        	compareConfig_PWM.compareValue = servo1Position;
+        	Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
         }
-        else if (resultsBuffer[0] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD && servo1Position < SERVO1_MAX)
-        {
-            servo1Position = servo1Position + SERVO1_MOVE;
-        }
-        compareConfig_PWM.compareValue = servo1Position;
-        Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
 
         char string[10];
         sprintf(string, "X: %5d", resultsBuffer[0]);
