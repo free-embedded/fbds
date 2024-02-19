@@ -27,7 +27,7 @@ int servo1Position = SERVO1_MID;
 
 /* Timer_A Compare Configuration Parameter  (PWM) */
 Timer_A_CompareModeConfig compareConfig_PWM = {
-    TIMER_A_CAPTURECOMPARE_REGISTER_2,        // Use CCR2
+    TIMER_A_CAPTURECOMPARE_REGISTER_1,        // Use CCR2
     TIMER_A_CAPTURECOMPARE_INTERRUPT_DISABLE, // Disable CCR interrupt
     TIMER_A_OUTPUTMODE_RESET_SET,             // Toggle output but
     SERVO1_MID                                // 1.5 ms pulse width
@@ -49,14 +49,14 @@ void _servoInit()
     // GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN5, GPIO_PRIMARY_MODULE_FUNCTION);
 
     // Configures P2.6 to PM_TA0.3 for using Timer PWM to control Servo1
-    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN6, GPIO_PRIMARY_MODULE_FUNCTION);
+    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN4, GPIO_PRIMARY_MODULE_FUNCTION);
 
     // Configuring Timer_A0 for Up Mode and starting
     Timer_A_configureUpMode(TIMER_A0_BASE, &upConfig);
     Timer_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);
 
     // Initialize compare registers to generate PWM  for the Servo1 Port
-    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3;
+    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_1;
     Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.6
 
     // // Initialize compare registers to generate PWM  for the Servo1 Port 2.5
