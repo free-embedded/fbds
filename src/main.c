@@ -13,7 +13,7 @@ static uint16_t resultsBuffer[2];
 #define map(x, in_min, in_max, out_min, out_max) \
     ((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
-// SERVO1 (HORIZONTAL) 2.4
+// SERVO1 (HORIZONTAL) 2.5
 #define SERVO1_MAX 1800
 #define SERVO1_MIN 450
 #define SERVO1_MID 1100
@@ -22,8 +22,8 @@ static uint16_t resultsBuffer[2];
 
 int servo1Position = SERVO1_MID;
 
-// SERVO2 (VERTICAL) 2.6
-// SERVO3 (TRIGGER) 2.5
+// SERVO2 (VERTICAL) 2.4
+// SERVO3 (TRIGGER) 2.6
 #define SERVOC_UP 1000
 #define SERVOC_STOP 1150
 #define SERVOC_DOWN 1200
@@ -59,22 +59,30 @@ void _servoInit()
     // Configures P2.5 to PM_TA0.2 for using Timer PWM to control Servo1
     GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN5, GPIO_PRIMARY_MODULE_FUNCTION);
 
-    // Configures P2.4 to PM_TA0.1 for using Timer PWM to control Servo1
+    // Configures P2.4 to PM_TA0.1 for using Timer PWM to control Servo2
     GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN4, GPIO_PRIMARY_MODULE_FUNCTION);
+
+    // Configures P2.6 to PM_TA0.3 for using Timer PWM to control Servo3
+    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN6, GPIO_PRIMARY_MODULE_FUNCTION);
 
     // Configuring Timer_A0 for Up Mode and starting
     Timer_A_configureUpMode(TIMER_A0_BASE, &upConfig);
     Timer_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);
 
-    // Initialize compare registers to generate PWM  for the Servo1 Port
-    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_1;
+    // Initialize compare registers to generate PWM  for the Servo2 Port
+    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_1; // For P2.4
     compareConfig_PWM.compareValue = SERVOC_STOP;
     Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.4
 
-    // // Initialize compare registers to generate PWM  for the Servo2 Port 2.5
-    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_2;
+    // Initialize compare registers to generate PWM  for the Servo1 Port 2.5
+    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_2; // For P2.5
     compareConfig_PWM.compareValue = SERVO1_MID;
     Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.5
+
+    // Initialize compare registers to generate PWM  for the Servo1 Port 2.6
+    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
+    compareConfig_PWM.compareValue = SERVOC_STOP;
+    Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.6
 }
 
 void _adcInit()
@@ -189,21 +197,37 @@ void ADC14_IRQHandler(void)
         resultsBuffer[0] = ADC14_getResult(ADC_MEM0);
         resultsBuffer[1] = ADC14_getResult(ADC_MEM1);
 
-        
+        // Determine if JoyStick bottom button is pressed
+        int bottomButtonPressed = 0;
+        if (!(P3IN & GPIO_PIN5))
+        {
+            bottomButtonPressed = 1;
+        }
+
+        // Determine if JoyStick top button is pressed
+        int topButtonPressed = 0;
+        if (!(P5IN & GPIO_PIN1))
+        {
+            topButtonPressed = 1;
+        }
 
         if (!turretAutomaticMode)
         {
-            if (resultsBuffer[1] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD && servo1Position > SERVO1_MIN)
+            // If the joystick is moved on the x-axis change the servo1 position
+            if (resultsBuffer[0] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD && servo1Position > SERVO1_MIN)
             {
                 servo1Position = servo1Position - SERVO1_MOVE;
             }
-            else if (resultsBuffer[1] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD && servo1Position < SERVO1_MAX)
+            else if (resultsBuffer[0] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD && servo1Position < SERVO1_MAX)
             {
                 servo1Position = servo1Position + SERVO1_MOVE;
             }
+            // Set the new pulse width for the servo1
             compareConfig_PWM.compareValue = servo1Position;
             compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_2;
             Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+
+            // If the joystick is moved on the y-axis change the servo2 movement direction
             if (resultsBuffer[1] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD)
             {
                 servo2Direction = SERVOC_DOWN;
@@ -212,16 +236,34 @@ void ADC14_IRQHandler(void)
             {
                 servo2Direction = SERVOC_UP;
             }
-            else {
+            else
+            {
+                // If the joystick is not moved stop the servo2
                 servo2Direction = SERVOC_STOP;
             }
-            // compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_2;
+            // Set the new pulse width for the servo2
             compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_1;
             compareConfig_PWM.compareValue = servo2Direction;
             Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+
+
+            // If one of the buttons is pressed change the servo3 movement direction
+            if (bottomButtonPressed){
+                servo3Direction = SERVOC_DOWN;
+            }
+            else if (topButtonPressed){
+                servo3Direction = SERVOC_UP;
+            }
+            else{
+                servo3Direction = SERVOC_STOP;
+            }
+            // Set the new pulse width for the servo3
+            compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3;
+            compareConfig_PWM.compareValue = servo3Direction;
+            Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
         }
 
-        sprintf(debugPrintString, "Servo1: %d", servo1Position);
+        sprintf(debugPrintString, "Servo3: %d", servo3Direction);
 
         Graphics_drawStringCentered(&g_sContext,
                                     debugPrintString,
@@ -247,13 +289,6 @@ void ADC14_IRQHandler(void)
                                     70,
                                     OPAQUE_TEXT);
 
-        // Determine if JoyStick top button is pressed
-        int topButtonPressed = 0;
-        if (!(P5IN & GPIO_PIN1))
-        {
-            topButtonPressed = 1;
-        }
-
         sprintf(string, "Top Button: %d", topButtonPressed);
         Graphics_drawStringCentered(&g_sContext,
                                     (int8_t *)string,
@@ -261,13 +296,6 @@ void ADC14_IRQHandler(void)
                                     64,
                                     90,
                                     OPAQUE_TEXT);
-
-        // Determine if JoyStick bottom button is pressed
-        int bottomButtonPressed = 0;
-        if (!(P3IN & GPIO_PIN5))
-        {
-            bottomButtonPressed = 1;
-        }
 
         sprintf(string, "Bottom Button: %d", bottomButtonPressed);
         Graphics_drawStringCentered(&g_sContext,
