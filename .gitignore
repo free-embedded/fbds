@@ -63,3 +63,8 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Vscode intellisense
+settings.json
+
+examples/*
