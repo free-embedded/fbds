@@ -140,12 +140,13 @@ void _servoInit(void)
 
     // Configure Tmer_A1 for the time measurement
     upConfig.captureCompareInterruptEnable_CCR0_CCIE = TIMER_A_CCIE_CCR0_INTERRUPT_ENABLE; // Enable CCR0 interrupt
-    upConfig.timerPeriod *= 66;                                                            // 1 second
+    upConfig.timerPeriod = 5000;                                                           // 1 second
     Timer_A_configureUpMode(TIMER_A1_BASE, &upConfig);
 
     Interrupt_enableInterrupt(INT_TA1_0);
 }
-1 void _adcInit()
+
+void _adcInit()
 {
     /* Configures Pin 6.0 and 4.4 as ADC input */
     GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P6, GPIO_PIN0, GPIO_TERTIARY_MODULE_FUNCTION);
@@ -450,9 +451,6 @@ void EUSCIA2_IRQHandler(void)
                                     10,
                                     OPAQUE_TEXT);
 
-        servo2Direction = SERVOC_STOP;
-        changeServo2Direction();
-
         switch (RXData)
         {
         // left
@@ -472,30 +470,36 @@ void EUSCIA2_IRQHandler(void)
             }
             break;
         // up
-        case 3:
-            if (TA1_State == TA1_TRIGGER)
-                break;
-            servo2Direction = SERVOC_UP;
-            changeServo2Direction();
-            TA1_State = TA1_State;
-            Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
-            break;
-        // down
         case 2:
-            if (TA1_State == TA1_TRIGGER)
-                break;
+            // if (TA1_State != TA1_NO_MOVE)
+            // break;
             servo2Direction = SERVOC_DOWN;
             changeServo2Direction();
-            TA1_State = TA1_AUTO_MOVE;
-            Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
+            // TA1_State = TA1_State;
+            // Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
+            break;
+        // down
+        case 3:
+            // if (TA1_State != TA1_NO_MOVE)
+            //     break;
+            servo2Direction = SERVOC_UP;
+            changeServo2Direction();
+            // TA1_State = TA1_State;
+            // Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
             break;
         // centered
         case 4:
-            if (TA1_State == TA1_NO_MOVE)
+            if (TA1_State != TA1_NO_MOVE)
                 break;
             pressTrigger();
             break;
         }
+
+
+        for (int i = 0; i < 100000; i++)
+            ;
+        servo2Direction = SERVOC_STOP;
+        changeServo2Direction();
 
         Interrupt_disableSleepOnIsrExit();
     }
