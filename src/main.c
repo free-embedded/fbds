@@ -351,6 +351,8 @@ void ADC14_IRQHandler(void)
         int topButtonPressed = 0;
         if (!(P5IN & GPIO_PIN1))
         {
+            // draw orso
+            Graphics_drawImage(&g_sContext, &orso8BPP_UNCOMP, 0, 0);
             turretAutomaticMode = false;
         }
 
@@ -419,20 +421,20 @@ void ADC14_IRQHandler(void)
                                     70,
                                     OPAQUE_TEXT);
 
-        sprintf(string, "Top Button: %d", topButtonPressed);
+
+        if (turretAutomaticMode)
+        {
+            sprintf(string, "Automatic Mode");
+        }
+        else
+        {
+            sprintf(string, "Manual Mode");
+        }
         Graphics_drawStringCentered(&g_sContext,
                                     (int8_t *)string,
                                     AUTO_STRING_LENGTH,
                                     64,
                                     90,
-                                    OPAQUE_TEXT);
-
-        sprintf(string, "Bottom Button: %d", bottomButtonPressed);
-        Graphics_drawStringCentered(&g_sContext,
-                                    (int8_t *)string,
-                                    AUTO_STRING_LENGTH,
-                                    64,
-                                    110,
                                     OPAQUE_TEXT);
     }
 }
