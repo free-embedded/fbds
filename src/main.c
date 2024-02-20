@@ -24,12 +24,15 @@ int servo1Position = SERVO1_MID;
 
 // SERVO2 (VERTICAL) 2.4
 // SERVO3 (TRIGGER) 2.6
-#define SERVOC_UP 1000
+#define SERVOC_DOWN 1000
 #define SERVOC_STOP 1150
-#define SERVOC_DOWN 1200
+#define SERVOC_UP 1200
 
 int servo2Direction = SERVOC_STOP;
 int servo3Direction = SERVOC_STOP;
+
+#define TRIGGER_TIMER_MAX_CYCLES 8
+uint8_t triggerTimerCycles = 0;
 
 int turretAutomaticMode = false;
 
@@ -173,6 +176,33 @@ void _hwInit()
     _servoInit();
 }
 
+void moveServo1(void)
+{
+    compareConfig_PWM.compareValue = servo1Position;
+    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_2;  // For P2.5
+    Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+}
+
+void changeServo2Direction()
+{
+    compareConfig_PWM.compareValue = servo2Direction;
+    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_1; // For P2.4
+    Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+}
+
+void pressTrigger()
+{
+    // Servo3 is releasing the trigger
+    servo3Direction = SERVOC_DOWN;
+    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
+    compareConfig_PWM.compareValue = servo3Direction;
+    Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+
+    // Start the timer to press the trigger
+    triggerTimerCycles = 1;
+    Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
+}
+
 char debugPrintString[20];
 
 /*
@@ -188,9 +218,6 @@ int main(void)
     }
 }
 
-#define TIMER_MAX_CYCLES 8
-uint8_t timerCycles = 0;
-
 /*
  * Timer A1_0 interrupt service routine
  */
@@ -198,15 +225,15 @@ void TA1_0_IRQHandler(void)
 {
     Timer_A_clearCaptureCompareInterrupt(TIMER_A1_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_0);
 
-    switch (timerCycles)
+    switch (triggerTimerCycles)
     {
-    case TIMER_MAX_CYCLES: // If the timer has reached the maximum cycles release the trigger
-        servo3Direction = SERVOC_DOWN;
+    case TRIGGER_TIMER_MAX_CYCLES: // If the timer has reached the maximum cycles release the trigger
+        servo3Direction = SERVOC_UP;
         compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
         compareConfig_PWM.compareValue = servo3Direction;
         Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
         // Start the timer again
-        timerCycles--;
+        triggerTimerCycles--;
         Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
         break;
     case 0:
@@ -216,8 +243,8 @@ void TA1_0_IRQHandler(void)
         Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
         break;
     default:
-        // If the servo is pressing the trigger increase the timerCycles otherwise decrease it
-        timerCycles = timerCycles + (servo3Direction == SERVOC_UP ? 1 : -1);
+        // If the servo is pressing the trigger increase the triggerTimerCycles otherwise decrease it
+        triggerTimerCycles = triggerTimerCycles + (servo3Direction == SERVOC_DOWN ? 1 : -1);
         // Start the timer again
         Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
         break;
@@ -263,61 +290,40 @@ void ADC14_IRQHandler(void)
             if (resultsBuffer[0] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD && servo1Position > SERVO1_MIN)
             {
                 servo1Position = servo1Position - SERVO1_MOVE;
+                moveServo1();
             }
             else if (resultsBuffer[0] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD && servo1Position < SERVO1_MAX)
             {
                 servo1Position = servo1Position + SERVO1_MOVE;
+                moveServo1();
             }
-            // Set the new pulse width for the servo1
-            compareConfig_PWM.compareValue = servo1Position;
-            compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_2;
-            Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
 
             // If the joystick is moved on the y-axis change the servo2 movement direction
             if (resultsBuffer[1] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD)
             {
-                servo2Direction = SERVOC_DOWN;
+                servo2Direction = SERVOC_UP;
+                changeServo2Direction();
             }
             else if (resultsBuffer[1] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD)
             {
-                servo2Direction = SERVOC_UP;
+                servo2Direction = SERVOC_DOWN;
+                changeServo2Direction();
             }
-            else
+            else if (servo2Direction != SERVOC_STOP)
             {
                 // If the joystick is not moved stop the servo2
                 servo2Direction = SERVOC_STOP;
+                changeServo2Direction();
             }
-            // Set the new pulse width for the servo2
-            compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_1;
-            compareConfig_PWM.compareValue = servo2Direction;
-            Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
 
             // If one of the buttons is pressed and servo3 is still change the servo3 movement direction
             if (bottomButtonPressed && servo3Direction == SERVOC_STOP)
             {
-                // Servo3 is releasing the trigger
-                servo3Direction = SERVOC_UP;
-                compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
-                compareConfig_PWM.compareValue = servo3Direction;
-                Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
-
-                // Start the timer to press the trigger
-                timerCycles = 1;
-                Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
+                pressTrigger();
             }
-            // else if (topButtonPressed)
-            // {
-            //     // Servo3 is pressing the trigger
-            //     servo3Direction = SERVOC_UP;
-            // }
-            // else
-            // {
-            //     servo3Direction = SERVOC_STOP;
-            // }
-            // Set the new pulse width for the servo3
         }
 
-        sprintf(debugPrintString, "Servo3: %d, %d", servo3Direction, timerCycles);
+        sprintf(debugPrintString, "Servo2: %d, %d", servo2Direction, triggerTimerCycles);
 
         Graphics_drawStringCentered(&g_sContext,
                                     debugPrintString,
