@@ -27,8 +27,8 @@ static uint16_t previusResultsBuffer[2];
 /* Graphic library  context */
 Graphics_Context g_sContext;
 
-
-void _adcInit() {
+void _adcInit()
+{
     /* Configures Pin 6.0 and 4.4 as ADC input */
     GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P6, GPIO_PIN0, GPIO_TERTIARY_MODULE_FUNCTION);
     GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P4, GPIO_PIN4, GPIO_TERTIARY_MODULE_FUNCTION);
@@ -38,18 +38,18 @@ void _adcInit() {
     ADC14_initModule(ADC_CLOCKSOURCE_ADCOSC, ADC_PREDIVIDER_64, ADC_DIVIDER_8, 0);
 
     /* Configuring ADC Memory (ADC_MEM0 - ADC_MEM1 (A15, A9)  with repeat)
-         * with internal 2.5v reference */
+     * with internal 2.5v reference */
     ADC14_configureMultiSequenceMode(ADC_MEM0, ADC_MEM1, true);
     ADC14_configureConversionMemory(ADC_MEM0,
-        ADC_VREFPOS_AVCC_VREFNEG_VSS,
-        ADC_INPUT_A15, ADC_NONDIFFERENTIAL_INPUTS);
+                                    ADC_VREFPOS_AVCC_VREFNEG_VSS,
+                                    ADC_INPUT_A15, ADC_NONDIFFERENTIAL_INPUTS);
 
     ADC14_configureConversionMemory(ADC_MEM1,
-        ADC_VREFPOS_AVCC_VREFNEG_VSS,
-        ADC_INPUT_A9, ADC_NONDIFFERENTIAL_INPUTS);
+                                    ADC_VREFPOS_AVCC_VREFNEG_VSS,
+                                    ADC_INPUT_A9, ADC_NONDIFFERENTIAL_INPUTS);
 
-/* Enabling the interrupt when a conversion on channel 1 (end of sequence)
- *  is complete and enabling conversions */
+    /* Enabling the interrupt when a conversion on channel 1 (end of sequence)
+     *  is complete and enabling conversions */
     ADC14_enableInterrupt(ADC_INT1);
 
     /* Enabling Interrupts */
@@ -66,7 +66,8 @@ void _adcInit() {
     ADC14_toggleConversionTrigger();
 }
 
-void _graphicsInit() {
+void _graphicsInit()
+{
     /* Initializes display */
     Crystalfontz128x128_Init();
 
@@ -83,7 +84,8 @@ void _graphicsInit() {
     Graphics_drawImage(&g_sContext, &orso8BPP_UNCOMP, 0, 0);
 }
 
-void _hwInit() {
+void _hwInit()
+{
     /* Halting WDT and disabling master interrupts */
     WDT_A_holdTimer();
     Interrupt_disableMaster();
@@ -107,45 +109,48 @@ void _hwInit() {
     _toneInit();
 }
 
-uint16_t map_value(uint16_t value, uint16_t from_min, uint16_t from_max, uint16_t to_min, uint16_t to_max) {
+uint16_t map_value(uint16_t value, uint16_t from_min, uint16_t from_max, uint16_t to_min, uint16_t to_max)
+{
     return (value - from_min) * (to_max - to_min) / (from_max - from_min) + to_min;
 }
 
-uint16_t percent_delta(uint16_t value, uint16_t previus_value) {
+uint16_t percent_delta(uint16_t value, uint16_t previus_value)
+{
     return (value - previus_value) * 100 / joystick_max_value;
 }
 
 int sos = 69;
 char str[10];
 
-
-int main(void) {
+int main(void)
+{
     _hwInit();
     play_song(hedwigsTheme);
 }
 
-
 /* This interrupt is fired whenever a conversion is completed and placed in
  * ADC_MEM1. This signals the end of conversion and the results array is
  * grabbed and placed in resultsBuffer */
-void ADC14_IRQHandler(void) {
+void ADC14_IRQHandler(void)
+{
     uint64_t status;
 
     status = ADC14_getEnabledInterruptStatus();
     ADC14_clearInterruptFlag(status);
 
     /* ADC_MEM1 conversion completed */
-    if (status & ADC_INT1) {
+    if (status & ADC_INT1)
+    {
         /* Store ADC14 conversion results */
         resultsBuffer[0] = ADC14_getResult(ADC_MEM0);
         resultsBuffer[1] = ADC14_getResult(ADC_MEM1);
 
         // if the delta is huge, redraw the image. This is to avoid flickering5
         if (percent_delta(resultsBuffer[0], previusResultsBuffer[0]) > 7 || previusResultsBuffer[0] == 0 ||
-            percent_delta(resultsBuffer[1], previusResultsBuffer[1]) > 7 || previusResultsBuffer[1] == 0) {
+            percent_delta(resultsBuffer[1], previusResultsBuffer[1]) > 7 || previusResultsBuffer[1] == 0)
+        {
             previusResultsBuffer[0] = resultsBuffer[0];
             previusResultsBuffer[1] = resultsBuffer[1];
-
 
             // draw sight (circle + cross)
 
