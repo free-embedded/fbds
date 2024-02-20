@@ -4,11 +4,24 @@
 #include "LcdDriver/Crystalfontz128x128_ST7735.h"
 #include <stdio.h>
 
-/* Graphic library context */
-Graphics_Context g_sContext;
+#include <stdint.h>
+#include "notes.h"
+#include "song.h"
+#include "player.h"
+
+
+extern Song hedwigsTheme; // Declare external reference to the song defined elsewhere
+
+const uint16_t joystick_max_value = 16362; // should be 16384
+
+extern Graphics_Image orso8BPP_UNCOMP;
 
 /* ADC results buffer */
 static uint16_t resultsBuffer[2];
+static uint16_t previusResultsBuffer[2];
+
+/* Graphic library  context */
+Graphics_Context g_sContext;
 
 #define map(x, in_min, in_max, out_min, out_max) \
     ((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
@@ -57,8 +70,7 @@ Timer_A_UpModeConfig upConfig = {
     TIMER_A_DO_CLEAR                     // Clear value
 };
 
-void _servoInit()
-{
+void _servoInit() {
     // Configures P2.5 to PM_TA0.2 for using Timer PWM to control Servo1
     GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN5, GPIO_PRIMARY_MODULE_FUNCTION);
 
@@ -96,8 +108,7 @@ void _servoInit()
     Interrupt_enableInterrupt(INT_TA1_0);
 }
 
-void _adcInit()
-{
+void _adcInit() {
     /* Configures Pin 6.0 and 4.4 as ADC input */
     GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P6, GPIO_PIN0, GPIO_TERTIARY_MODULE_FUNCTION);
     GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P4, GPIO_PIN4, GPIO_TERTIARY_MODULE_FUNCTION);
@@ -110,15 +121,15 @@ void _adcInit()
      * with internal 2.5v reference */
     ADC14_configureMultiSequenceMode(ADC_MEM0, ADC_MEM1, true);
     ADC14_configureConversionMemory(ADC_MEM0,
-                                    ADC_VREFPOS_AVCC_VREFNEG_VSS,
-                                    ADC_INPUT_A15, ADC_NONDIFFERENTIAL_INPUTS);
+        ADC_VREFPOS_AVCC_VREFNEG_VSS,
+        ADC_INPUT_A15, ADC_NONDIFFERENTIAL_INPUTS);
 
     ADC14_configureConversionMemory(ADC_MEM1,
-                                    ADC_VREFPOS_AVCC_VREFNEG_VSS,
-                                    ADC_INPUT_A9, ADC_NONDIFFERENTIAL_INPUTS);
+        ADC_VREFPOS_AVCC_VREFNEG_VSS,
+        ADC_INPUT_A9, ADC_NONDIFFERENTIAL_INPUTS);
 
-    /* Enabling the interrupt when a conversion on channel 1 (end of sequence)
-     *  is complete and enabling conversions */
+/* Enabling the interrupt when a conversion on channel 1 (end of sequence)
+ *  is complete and enabling conversions */
     ADC14_enableInterrupt(ADC_INT1);
 
     /* Enabling Interrupts */
@@ -135,8 +146,7 @@ void _adcInit()
     ADC14_toggleConversionTrigger();
 }
 
-void _graphicsInit()
-{
+void _graphicsInit() {
     /* Initializes display */
     Crystalfontz128x128_Init();
 
@@ -149,10 +159,11 @@ void _graphicsInit()
     Graphics_setBackgroundColor(&g_sContext, GRAPHICS_COLOR_WHITE);
     GrContextFontSet(&g_sContext, &g_sFontFixed6x8);
     Graphics_clearDisplay(&g_sContext);
+
+    Graphics_drawImage(&g_sContext, &orso8BPP_UNCOMP, 0, 0);
 }
 
-void _hwInit()
-{
+void _hwInit() {
     /* Halting WDT and disabling master interrupts */
     WDT_A_holdTimer();
     Interrupt_disableMaster();
@@ -174,24 +185,23 @@ void _hwInit()
     _graphicsInit();
     _adcInit();
     _servoInit();
+    _toneInit();
 }
 
-void moveServo1(void)
-{
+
+void moveServo1(void) {
     compareConfig_PWM.compareValue = servo1Position;
     compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_2;  // For P2.5
     Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
 }
 
-void changeServo2Direction()
-{
+void changeServo2Direction() {
     compareConfig_PWM.compareValue = servo2Direction;
     compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_1; // For P2.4
     Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
 }
 
-void pressTrigger()
-{
+void pressTrigger() {
     // Servo3 is releasing the trigger
     servo3Direction = SERVOC_DOWN;
     compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
@@ -203,17 +213,21 @@ void pressTrigger()
     Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
 }
 
-char debugPrintString[20];
 
-/*
- * Main function
- */
-int main(void)
-{
+uint16_t map_value(uint16_t value, uint16_t from_min, uint16_t from_max, uint16_t to_min, uint16_t to_max) {
+    return (value - from_min) * (to_max - to_min) / (from_max - from_min) + to_min;
+}
+
+uint16_t percent_delta(uint16_t value, uint16_t previus_value) {
+    return (value - previus_value) * 100 / joystick_max_value;
+}
+
+int main(void) {
     _hwInit();
+    play_song(hedwigsTheme);
 
-    while (1)
-    {
+
+    while (1) {
         PCM_gotoLPM0();
     }
 }
@@ -221,12 +235,10 @@ int main(void)
 /*
  * Timer A1_0 interrupt service routine
  */
-void TA1_0_IRQHandler(void)
-{
+void TA1_0_IRQHandler(void) {
     Timer_A_clearCaptureCompareInterrupt(TIMER_A1_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_0);
 
-    switch (triggerTimerCycles)
-    {
+    switch (triggerTimerCycles) {
     case TRIGGER_TIMER_MAX_CYCLES: // If the timer has reached the maximum cycles release the trigger
         servo3Direction = SERVOC_UP;
         compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
@@ -254,115 +266,94 @@ void TA1_0_IRQHandler(void)
 /*
  * This interrupt is fired whenever a conversion is completed and placed in
  * ADC_MEM1. This signals the end of conversion and the results array is
- * grabbed and placed in resultsBuffer
- */
-void ADC14_IRQHandler(void)
-{
+ * grabbed and placed in resultsBuffer */
+void ADC14_IRQHandler(void) {
     uint64_t status;
 
     status = ADC14_getEnabledInterruptStatus();
     ADC14_clearInterruptFlag(status);
 
     /* ADC_MEM1 conversion completed */
-    if (status & ADC_INT1)
-    {
+    if (status & ADC_INT1) {
         /* Store ADC14 conversion results */
         resultsBuffer[0] = ADC14_getResult(ADC_MEM0);
         resultsBuffer[1] = ADC14_getResult(ADC_MEM1);
 
         // Determine if JoyStick bottom button is pressed
         int bottomButtonPressed = 0;
-        if (!(P3IN & GPIO_PIN5))
-        {
+        if (!(P3IN & GPIO_PIN5)) {
             bottomButtonPressed = 1;
         }
 
         // Determine if JoyStick top button is pressed
         int topButtonPressed = 0;
-        if (!(P5IN & GPIO_PIN1))
-        {
+        if (!(P5IN & GPIO_PIN1)) {
             topButtonPressed = 1;
         }
 
-        if (!turretAutomaticMode)
-        {
+        if (!turretAutomaticMode) {
             // If the joystick is moved on the x-axis change the servo1 position
-            if (resultsBuffer[0] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD && servo1Position > SERVO1_MIN)
-            {
+            if (resultsBuffer[0] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD && servo1Position > SERVO1_MIN) {
                 servo1Position = servo1Position - SERVO1_MOVE;
                 moveServo1();
             }
-            else if (resultsBuffer[0] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD && servo1Position < SERVO1_MAX)
-            {
+            else if (resultsBuffer[0] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD && servo1Position < SERVO1_MAX) {
                 servo1Position = servo1Position + SERVO1_MOVE;
                 moveServo1();
             }
 
             // If the joystick is moved on the y-axis change the servo2 movement direction
-            if (resultsBuffer[1] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD)
-            {
+            if (resultsBuffer[1] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD) {
                 servo2Direction = SERVOC_UP;
                 changeServo2Direction();
             }
-            else if (resultsBuffer[1] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD)
-            {
+            else if (resultsBuffer[1] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD) {
                 servo2Direction = SERVOC_DOWN;
                 changeServo2Direction();
             }
-            else if (servo2Direction != SERVOC_STOP)
-            {
+            else if (servo2Direction != SERVOC_STOP) {
                 // If the joystick is not moved stop the servo2
                 servo2Direction = SERVOC_STOP;
                 changeServo2Direction();
             }
 
             // If one of the buttons is pressed and servo3 is still change the servo3 movement direction
-            if (bottomButtonPressed && servo3Direction == SERVOC_STOP)
-            {
+            if (bottomButtonPressed && servo3Direction == SERVOC_STOP) {
                 pressTrigger();
             }
         }
 
-        sprintf(debugPrintString, "Servo2: %d, %d", servo2Direction, triggerTimerCycles);
 
-        Graphics_drawStringCentered(&g_sContext,
-                                    debugPrintString,
-                                    AUTO_STRING_LENGTH,
-                                    64,
-                                    30,
-                                    OPAQUE_TEXT);
+        // if the delta is huge, redraw the image. This is to avoid flickering5
+        if (percent_delta(resultsBuffer[0], previusResultsBuffer[0]) > 7 || previusResultsBuffer[0] == 0 ||
+            percent_delta(resultsBuffer[1], previusResultsBuffer[1]) > 7 || previusResultsBuffer[1] == 0) {
+            previusResultsBuffer[0] = resultsBuffer[0];
+            previusResultsBuffer[1] = resultsBuffer[1];
 
-        char string[10];
-        sprintf(string, "X: %5d", resultsBuffer[0]);
-        Graphics_drawStringCentered(&g_sContext,
-                                    (int8_t *)string,
-                                    8,
-                                    64,
-                                    50,
-                                    OPAQUE_TEXT);
+            // draw sight (circle + cross)
 
-        sprintf(string, "Y: %5d", resultsBuffer[1]);
-        Graphics_drawStringCentered(&g_sContext,
-                                    (int8_t *)string,
-                                    8,
-                                    64,
-                                    70,
-                                    OPAQUE_TEXT);
+            // map the joystick values to the screen
+            uint16_t x_offset = map_value(resultsBuffer[0], 0, joystick_max_value, 0, 128);
+            uint16_t y_offset = 128 - map_value(resultsBuffer[1], 0, joystick_max_value, 0, 128); // invert y axis
 
-        sprintf(string, "Top Button: %d", topButtonPressed);
-        Graphics_drawStringCentered(&g_sContext,
-                                    (int8_t *)string,
-                                    AUTO_STRING_LENGTH,
-                                    64,
-                                    90,
-                                    OPAQUE_TEXT);
+            // redraw the image
+            Graphics_drawImage(&g_sContext, &orso8BPP_UNCOMP, 0, 0);
 
-        sprintf(string, "Bottom Button: %d", bottomButtonPressed);
-        Graphics_drawStringCentered(&g_sContext,
-                                    (int8_t *)string,
-                                    AUTO_STRING_LENGTH,
-                                    64,
-                                    110,
-                                    OPAQUE_TEXT);
+            // draw cross
+            // horizontal
+            Graphics_drawLineH(&g_sContext, x_offset - 20, x_offset + 20, y_offset - 1);
+            Graphics_drawLineH(&g_sContext, x_offset - 20, x_offset + 20, y_offset);
+            Graphics_drawLineH(&g_sContext, x_offset - 20, x_offset + 20, y_offset + 1);
+
+            // vertical
+            Graphics_drawLineV(&g_sContext, x_offset - 1, y_offset - 20, y_offset + 20);
+            Graphics_drawLineV(&g_sContext, x_offset, y_offset - 20, y_offset + 20);
+            Graphics_drawLineV(&g_sContext, x_offset + 1, y_offset - 20, y_offset + 20);
+
+            // draw circle
+            Graphics_drawCircle(&g_sContext, x_offset, y_offset, 15);
+            Graphics_drawCircle(&g_sContext, x_offset, y_offset, 16);
+        }
+
     }
 }

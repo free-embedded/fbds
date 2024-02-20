@@ -1,0 +1,8 @@
+{
+	"C_Cpp.default.compilerPath": "${env:GCC_ARMCOMPILER}/bin/arm-none-eabi-gcc",
+	"files.associations": {
+		"crystalfontz128x128_st7735.h": "c",
+		"player.h": "c",
+		"hedwings_theme.h": "c"
+	}
+}
