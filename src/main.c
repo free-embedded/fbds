@@ -45,7 +45,7 @@ Timer_A_CompareModeConfig compareConfig_PWM = {
 };
 
 /* Timer_A Up Configuration Parameter */
-const Timer_A_UpModeConfig upConfig = {
+Timer_A_UpModeConfig upConfig = {
     TIMER_A_CLOCKSOURCE_SMCLK,           // SMCLK = 48 MhZ
     TIMER_A_CLOCKSOURCE_DIVIDER_64,      // SMCLK/64 = 750 KhZ
     15000,                               // 0.02 s * 750 KhZ = 15000 tick period
@@ -83,6 +83,14 @@ void _servoInit()
     compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
     compareConfig_PWM.compareValue = SERVOC_STOP;
     Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.6
+
+    // Configure Tmer_A1 for the time measurement
+    upConfig.captureCompareInterruptEnable_CCR0_CCIE = TIMER_A_CCIE_CCR0_INTERRUPT_ENABLE; // Enable CCR0 interrupt
+    upConfig.timerPeriod *= 200;                                                           // 1 second
+    Timer_A_configureUpMode(TIMER_A1_BASE, &upConfig);
+
+    // Interrupt_enableSleepOnIsrExit();
+    Interrupt_enableInterrupt(INT_TA1_0);
 }
 
 void _adcInit()
@@ -180,9 +188,47 @@ int main(void)
     }
 }
 
-/* This interrupt is fired whenever a conversion is completed and placed in
+#define TIMER_MAX_CYCLES 8
+uint8_t timerCycles = 0;
+
+/*
+ * Timer A1_0 interrupt service routine
+ */
+void TA1_0_IRQHandler(void)
+{
+    Timer_A_clearCaptureCompareInterrupt(TIMER_A1_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_0);
+
+    switch (timerCycles)
+    {
+    case TIMER_MAX_CYCLES: // If the timer has reached the maximum cycles release the trigger
+        servo3Direction = SERVOC_DOWN;
+        compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
+        compareConfig_PWM.compareValue = servo3Direction;
+        Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+        // Start the timer again
+        timerCycles--;
+        Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
+        break;
+    case 0:
+        servo3Direction = SERVOC_STOP;                                         // If the timer has reached the minimum cycles stop the trigger
+        compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
+        compareConfig_PWM.compareValue = servo3Direction;
+        Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+        break;
+    default:
+        // If the servo is pressing the trigger increase the timerCycles otherwise decrease it
+        timerCycles = timerCycles + (servo3Direction == SERVOC_UP ? 1 : -1);
+        // Start the timer again
+        Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
+        break;
+    }
+}
+
+/*
+ * This interrupt is fired whenever a conversion is completed and placed in
  * ADC_MEM1. This signals the end of conversion and the results array is
- * grabbed and placed in resultsBuffer */
+ * grabbed and placed in resultsBuffer
+ */
 void ADC14_IRQHandler(void)
 {
     uint64_t status;
@@ -246,24 +292,32 @@ void ADC14_IRQHandler(void)
             compareConfig_PWM.compareValue = servo2Direction;
             Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
 
-
-            // If one of the buttons is pressed change the servo3 movement direction
-            if (bottomButtonPressed){
-                servo3Direction = SERVOC_DOWN;
-            }
-            else if (topButtonPressed){
+            // If one of the buttons is pressed and servo3 is still change the servo3 movement direction
+            if (bottomButtonPressed && servo3Direction == SERVOC_STOP)
+            {
+                // Servo3 is releasing the trigger
                 servo3Direction = SERVOC_UP;
+                compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
+                compareConfig_PWM.compareValue = servo3Direction;
+                Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+
+                // Start the timer to press the trigger
+                timerCycles = 1;
+                Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
             }
-            else{
-                servo3Direction = SERVOC_STOP;
-            }
+            // else if (topButtonPressed)
+            // {
+            //     // Servo3 is pressing the trigger
+            //     servo3Direction = SERVOC_UP;
+            // }
+            // else
+            // {
+            //     servo3Direction = SERVOC_STOP;
+            // }
             // Set the new pulse width for the servo3
-            compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3;
-            compareConfig_PWM.compareValue = servo3Direction;
-            Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
         }
 
-        sprintf(debugPrintString, "Servo3: %d", servo3Direction);
+        sprintf(debugPrintString, "Servo3: %d, %d", servo3Direction, timerCycles);
 
         Graphics_drawStringCentered(&g_sContext,
                                     debugPrintString,
