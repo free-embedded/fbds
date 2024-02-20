@@ -10,7 +10,94 @@ Graphics_Context g_sContext;
 /* ADC results buffer */
 static uint16_t resultsBuffer[2];
 
-void _adcInit() {
+#define map(x, in_min, in_max, out_min, out_max) \
+    ((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
+
+// SERVO1 (HORIZONTAL) 2.5
+#define SERVO1_MAX 1800
+#define SERVO1_MIN 450
+#define SERVO1_MID 1100
+
+#define SERVO1_MOVE 100
+
+int servo1Position = SERVO1_MID;
+
+// SERVO2 (VERTICAL) 2.4
+// SERVO3 (TRIGGER) 2.6
+#define SERVOC_DOWN 1000
+#define SERVOC_STOP 1150
+#define SERVOC_UP 1200
+
+int servo2Direction = SERVOC_STOP;
+int servo3Direction = SERVOC_STOP;
+
+#define TRIGGER_TIMER_MAX_CYCLES 8
+uint8_t triggerTimerCycles = 0;
+
+int turretAutomaticMode = false;
+
+#define JOYSTICK_TRESHOLD 2500
+#define JOYSTICK_CENTER 8192
+
+/* Timer_A Compare Configuration Parameter  (PWM) */
+Timer_A_CompareModeConfig compareConfig_PWM = {
+    TIMER_A_CAPTURECOMPARE_REGISTER_1,        // Use CCR1
+    TIMER_A_CAPTURECOMPARE_INTERRUPT_DISABLE, // Disable CCR interrupt
+    TIMER_A_OUTPUTMODE_RESET_SET,             // Toggle output but
+    SERVO1_MID                                // 1.5 ms pulse width
+};
+
+/* Timer_A Up Configuration Parameter */
+Timer_A_UpModeConfig upConfig = {
+    TIMER_A_CLOCKSOURCE_SMCLK,           // SMCLK = 48 MhZ
+    TIMER_A_CLOCKSOURCE_DIVIDER_64,      // SMCLK/64 = 750 KhZ
+    15000,                               // 0.02 s * 750 KhZ = 15000 tick period
+    TIMER_A_TAIE_INTERRUPT_DISABLE,      // Disable Timer interrupt
+    TIMER_A_CCIE_CCR0_INTERRUPT_DISABLE, // Disable CCR0 interrupt
+    TIMER_A_DO_CLEAR                     // Clear value
+};
+
+void _servoInit()
+{
+    // Configures P2.5 to PM_TA0.2 for using Timer PWM to control Servo1
+    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN5, GPIO_PRIMARY_MODULE_FUNCTION);
+
+    // Configures P2.4 to PM_TA0.1 for using Timer PWM to control Servo2
+    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN4, GPIO_PRIMARY_MODULE_FUNCTION);
+
+    // Configures P2.6 to PM_TA0.3 for using Timer PWM to control Servo3
+    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P2, GPIO_PIN6, GPIO_PRIMARY_MODULE_FUNCTION);
+
+    // Configuring Timer_A0 for Up Mode and starting
+    Timer_A_configureUpMode(TIMER_A0_BASE, &upConfig);
+    Timer_A_startCounter(TIMER_A0_BASE, TIMER_A_UP_MODE);
+
+    // Initialize compare registers to generate PWM  for the Servo2 Port
+    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_1; // For P2.4
+    compareConfig_PWM.compareValue = SERVOC_STOP;
+    Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.4
+
+    // Initialize compare registers to generate PWM  for the Servo1 Port 2.5
+    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_2; // For P2.5
+    compareConfig_PWM.compareValue = SERVO1_MID;
+    Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.5
+
+    // Initialize compare registers to generate PWM  for the Servo1 Port 2.6
+    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
+    compareConfig_PWM.compareValue = SERVOC_STOP;
+    Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM); // For P2.6
+
+    // Configure Tmer_A1 for the time measurement
+    upConfig.captureCompareInterruptEnable_CCR0_CCIE = TIMER_A_CCIE_CCR0_INTERRUPT_ENABLE; // Enable CCR0 interrupt
+    upConfig.timerPeriod *= 200;                                                           // 1 second
+    Timer_A_configureUpMode(TIMER_A1_BASE, &upConfig);
+
+    // Interrupt_enableSleepOnIsrExit();
+    Interrupt_enableInterrupt(INT_TA1_0);
+}
+
+void _adcInit()
+{
     /* Configures Pin 6.0 and 4.4 as ADC input */
     GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P6, GPIO_PIN0, GPIO_TERTIARY_MODULE_FUNCTION);
     GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P4, GPIO_PIN4, GPIO_TERTIARY_MODULE_FUNCTION);
@@ -20,18 +107,18 @@ void _adcInit() {
     ADC14_initModule(ADC_CLOCKSOURCE_ADCOSC, ADC_PREDIVIDER_64, ADC_DIVIDER_8, 0);
 
     /* Configuring ADC Memory (ADC_MEM0 - ADC_MEM1 (A15, A9)  with repeat)
-         * with internal 2.5v reference */
+     * with internal 2.5v reference */
     ADC14_configureMultiSequenceMode(ADC_MEM0, ADC_MEM1, true);
     ADC14_configureConversionMemory(ADC_MEM0,
-        ADC_VREFPOS_AVCC_VREFNEG_VSS,
-        ADC_INPUT_A15, ADC_NONDIFFERENTIAL_INPUTS);
+                                    ADC_VREFPOS_AVCC_VREFNEG_VSS,
+                                    ADC_INPUT_A15, ADC_NONDIFFERENTIAL_INPUTS);
 
     ADC14_configureConversionMemory(ADC_MEM1,
-        ADC_VREFPOS_AVCC_VREFNEG_VSS,
-        ADC_INPUT_A9, ADC_NONDIFFERENTIAL_INPUTS);
+                                    ADC_VREFPOS_AVCC_VREFNEG_VSS,
+                                    ADC_INPUT_A9, ADC_NONDIFFERENTIAL_INPUTS);
 
-/* Enabling the interrupt when a conversion on channel 1 (end of sequence)
- *  is complete and enabling conversions */
+    /* Enabling the interrupt when a conversion on channel 1 (end of sequence)
+     *  is complete and enabling conversions */
     ADC14_enableInterrupt(ADC_INT1);
 
     /* Enabling Interrupts */
@@ -48,7 +135,8 @@ void _adcInit() {
     ADC14_toggleConversionTrigger();
 }
 
-void _graphicsInit() {
+void _graphicsInit()
+{
     /* Initializes display */
     Crystalfontz128x128_Init();
 
@@ -61,17 +149,10 @@ void _graphicsInit() {
     Graphics_setBackgroundColor(&g_sContext, GRAPHICS_COLOR_WHITE);
     GrContextFontSet(&g_sContext, &g_sFontFixed6x8);
     Graphics_clearDisplay(&g_sContext);
-
-    Graphics_drawStringCentered(&g_sContext,
-        (int8_t*)"Joystick:",
-        AUTO_STRING_LENGTH,
-        64,
-        30,
-        OPAQUE_TEXT);
-
 }
 
-void _hwInit() {
+void _hwInit()
+{
     /* Halting WDT and disabling master interrupts */
     WDT_A_holdTimer();
     Interrupt_disableMaster();
@@ -92,64 +173,196 @@ void _hwInit() {
 
     _graphicsInit();
     _adcInit();
+    _servoInit();
 }
+
+void moveServo1(void)
+{
+    compareConfig_PWM.compareValue = servo1Position;
+    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_2;  // For P2.5
+    Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+}
+
+void changeServo2Direction()
+{
+    compareConfig_PWM.compareValue = servo2Direction;
+    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_1; // For P2.4
+    Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+}
+
+void pressTrigger()
+{
+    // Servo3 is releasing the trigger
+    servo3Direction = SERVOC_DOWN;
+    compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
+    compareConfig_PWM.compareValue = servo3Direction;
+    Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+
+    // Start the timer to press the trigger
+    triggerTimerCycles = 1;
+    Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
+}
+
+char debugPrintString[20];
 
 /*
  * Main function
  */
-int main(void) {
+int main(void)
+{
     _hwInit();
 
-
-    while (1) {
+    while (1)
+    {
         PCM_gotoLPM0();
     }
 }
 
+/*
+ * Timer A1_0 interrupt service routine
+ */
+void TA1_0_IRQHandler(void)
+{
+    Timer_A_clearCaptureCompareInterrupt(TIMER_A1_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_0);
 
-/* This interrupt is fired whenever a conversion is completed and placed in
+    switch (triggerTimerCycles)
+    {
+    case TRIGGER_TIMER_MAX_CYCLES: // If the timer has reached the maximum cycles release the trigger
+        servo3Direction = SERVOC_UP;
+        compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
+        compareConfig_PWM.compareValue = servo3Direction;
+        Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+        // Start the timer again
+        triggerTimerCycles--;
+        Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
+        break;
+    case 0:
+        servo3Direction = SERVOC_STOP;                                         // If the timer has reached the minimum cycles stop the trigger
+        compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
+        compareConfig_PWM.compareValue = servo3Direction;
+        Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+        break;
+    default:
+        // If the servo is pressing the trigger increase the triggerTimerCycles otherwise decrease it
+        triggerTimerCycles = triggerTimerCycles + (servo3Direction == SERVOC_DOWN ? 1 : -1);
+        // Start the timer again
+        Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
+        break;
+    }
+}
+
+/*
+ * This interrupt is fired whenever a conversion is completed and placed in
  * ADC_MEM1. This signals the end of conversion and the results array is
- * grabbed and placed in resultsBuffer */
-void ADC14_IRQHandler(void) {
+ * grabbed and placed in resultsBuffer
+ */
+void ADC14_IRQHandler(void)
+{
     uint64_t status;
 
     status = ADC14_getEnabledInterruptStatus();
     ADC14_clearInterruptFlag(status);
 
     /* ADC_MEM1 conversion completed */
-    if (status & ADC_INT1) {
+    if (status & ADC_INT1)
+    {
         /* Store ADC14 conversion results */
         resultsBuffer[0] = ADC14_getResult(ADC_MEM0);
         resultsBuffer[1] = ADC14_getResult(ADC_MEM1);
 
+        // Determine if JoyStick bottom button is pressed
+        int bottomButtonPressed = 0;
+        if (!(P3IN & GPIO_PIN5))
+        {
+            bottomButtonPressed = 1;
+        }
+
+        // Determine if JoyStick top button is pressed
+        int topButtonPressed = 0;
+        if (!(P5IN & GPIO_PIN1))
+        {
+            topButtonPressed = 1;
+        }
+
+        if (!turretAutomaticMode)
+        {
+            // If the joystick is moved on the x-axis change the servo1 position
+            if (resultsBuffer[0] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD && servo1Position > SERVO1_MIN)
+            {
+                servo1Position = servo1Position - SERVO1_MOVE;
+                moveServo1();
+            }
+            else if (resultsBuffer[0] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD && servo1Position < SERVO1_MAX)
+            {
+                servo1Position = servo1Position + SERVO1_MOVE;
+                moveServo1();
+            }
+
+            // If the joystick is moved on the y-axis change the servo2 movement direction
+            if (resultsBuffer[1] > JOYSTICK_CENTER + JOYSTICK_TRESHOLD)
+            {
+                servo2Direction = SERVOC_UP;
+                changeServo2Direction();
+            }
+            else if (resultsBuffer[1] < JOYSTICK_CENTER - JOYSTICK_TRESHOLD)
+            {
+                servo2Direction = SERVOC_DOWN;
+                changeServo2Direction();
+            }
+            else if (servo2Direction != SERVOC_STOP)
+            {
+                // If the joystick is not moved stop the servo2
+                servo2Direction = SERVOC_STOP;
+                changeServo2Direction();
+            }
+
+            // If one of the buttons is pressed and servo3 is still change the servo3 movement direction
+            if (bottomButtonPressed && servo3Direction == SERVOC_STOP)
+            {
+                pressTrigger();
+            }
+        }
+
+        sprintf(debugPrintString, "Servo2: %d, %d", servo2Direction, triggerTimerCycles);
+
+        Graphics_drawStringCentered(&g_sContext,
+                                    debugPrintString,
+                                    AUTO_STRING_LENGTH,
+                                    64,
+                                    30,
+                                    OPAQUE_TEXT);
+
         char string[10];
         sprintf(string, "X: %5d", resultsBuffer[0]);
         Graphics_drawStringCentered(&g_sContext,
-            (int8_t*)string,
-            8,
-            64,
-            50,
-            OPAQUE_TEXT);
+                                    (int8_t *)string,
+                                    8,
+                                    64,
+                                    50,
+                                    OPAQUE_TEXT);
 
         sprintf(string, "Y: %5d", resultsBuffer[1]);
         Graphics_drawStringCentered(&g_sContext,
-            (int8_t*)string,
-            8,
-            64,
-            70,
-            OPAQUE_TEXT);
+                                    (int8_t *)string,
+                                    8,
+                                    64,
+                                    70,
+                                    OPAQUE_TEXT);
 
-/* Determine if JoyStick button is pressed */
-        int buttonPressed = 0;
-        if (!(P4IN & GPIO_PIN1))
-            buttonPressed = 1;
-
-        sprintf(string, "Button: %d", buttonPressed);
+        sprintf(string, "Top Button: %d", topButtonPressed);
         Graphics_drawStringCentered(&g_sContext,
-            (int8_t*)string,
-            AUTO_STRING_LENGTH,
-            64,
-            90,
-            OPAQUE_TEXT);
+                                    (int8_t *)string,
+                                    AUTO_STRING_LENGTH,
+                                    64,
+                                    90,
+                                    OPAQUE_TEXT);
+
+        sprintf(string, "Bottom Button: %d", bottomButtonPressed);
+        Graphics_drawStringCentered(&g_sContext,
+                                    (int8_t *)string,
+                                    AUTO_STRING_LENGTH,
+                                    64,
+                                    110,
+                                    OPAQUE_TEXT);
     }
 }
