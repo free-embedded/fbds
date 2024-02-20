@@ -5,7 +5,7 @@ import cv2.aruco as aruco
 import serial
 
 # Setup serial connection
-ser = serial.Serial('COM6', 9600)
+ser = serial.Serial('/dev/ttyUSB0', 9600)
 
 # Define the Aruco dictionary
 aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_100)
@@ -14,7 +14,7 @@ aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_100)
 parameters =  aruco.DetectorParameters()
 
 # Initialize the video capture
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(2)
 
 # Define the width and height of the camera frame
 width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
@@ -29,7 +29,7 @@ tolerance = 50
 
 def read_from_esp32():
     if ser.inWaiting() > 0:  # Check if data is available
-        incoming_message = ser.readline().decode('utf-8').rstrip()  # Read the incoming message and decode it
+        incoming_message = ser.readline().decode('utf-8', errors='ignore').rstrip()
         print(f"Message from ESP32: {incoming_message}")
 
 # Define a function to print the movement instructions
@@ -75,7 +75,7 @@ while True:
         print_movement(x, y)
         cv2.waitKey(100)
     else:
-        print("No marker detected.")
+        print("No marker detected.\n")
         ser.write("no target\n".encode())
         cv2.waitKey(100)
     # Show the frame

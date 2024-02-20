@@ -11,7 +11,7 @@ Graphics_Context g_sContext;
 static uint16_t resultsBuffer[2];
 
 #define map(x, in_min, in_max, out_min, out_max) \
-    ((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
+	((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
 // SERVO1 (HORIZONTAL) 2.5
 #define SERVO1_MAX 1800
@@ -31,13 +31,20 @@ int servo1Position = SERVO1_MID;
 int servo2Direction = SERVOC_STOP;
 int servo3Direction = SERVOC_STOP;
 
-#define TRIGGER_TIMER_MAX_CYCLES 8
+#define TRIGGER_TIMER_MAX_CYCLES 10
 uint8_t triggerTimerCycles = 0;
 
-int turretAutomaticMode = false;
+int turretAutomaticMode = true;
 
 #define JOYSTICK_TRESHOLD 2500
 #define JOYSTICK_CENTER 8192
+
+// Timer_A_1 variables
+#define TA1_NO_MOVE 0
+#define TA1_AUTO_MOVE 1
+#define TA1_TRIGGER 2
+
+uint8_t TA1_State = TA1_NO_MOVE;
 
 /* Timer_A Compare Configuration Parameter  (PWM) */
 Timer_A_CompareModeConfig compareConfig_PWM = {
@@ -45,50 +52,50 @@ Timer_A_CompareModeConfig compareConfig_PWM = {
 	TIMER_A_CAPTURECOMPARE_INTERRUPT_DISABLE,
 	// Disable CCR interrupt
 	TIMER_A_OUTPUTMODE_RESET_SET, // Toggle output but
-	SERVO1_MID                                // 1.5 ms pulse width
+	SERVO1_MID					  // 1.5 ms pulse width
 };
 
 /* Timer_A Up Configuration Parameter */
 Timer_A_UpModeConfig upConfig = {
-	TIMER_A_CLOCKSOURCE_SMCLK, // SMCLK = 48 MhZ
+	TIMER_A_CLOCKSOURCE_SMCLK,		// SMCLK = 48 MhZ
 	TIMER_A_CLOCKSOURCE_DIVIDER_64, // SMCLK/64 = 750 KhZ
-	15000, // 0.02 s * 750 KhZ = 15000 tick period
+	15000,							// 0.02 s * 750 KhZ = 15000 tick period
 	TIMER_A_TAIE_INTERRUPT_DISABLE, // Disable Timer interrupt
 	TIMER_A_CCIE_CCR0_INTERRUPT_DISABLE,
 	// Disable CCR0 interrupt
-	TIMER_A_DO_CLEAR                     // Clear value
+	TIMER_A_DO_CLEAR // Clear value
 };
 
 /* UART Config - 115200 baud rate */
 /* 0 left, 1 right, 2 up, 3 down */
 const eUSCI_UART_ConfigV1 uartConfig =
-{
-	EUSCI_A_UART_CLOCKSOURCE_SMCLK, // SMCLK Clock Source
-	26, // BRDIV = 13
-	0, // UCxBRF = 0
-	37, // UCxBRS = 37
-	EUSCI_A_UART_NO_PARITY,
-	// No Parity
-	EUSCI_A_UART_LSB_FIRST, // MSB First
-	EUSCI_A_UART_ONE_STOP_BIT, // One stop bit
-	EUSCI_A_UART_MODE, // UART mode
-	EUSCI_A_UART_OVERSAMPLING_BAUDRATE_GENERATION, // Oversampling
-	EUSCI_A_UART_8_BIT_LEN                  // 8 bit data length
+	{
+		EUSCI_A_UART_CLOCKSOURCE_SMCLK, // SMCLK Clock Source
+		26,								// BRDIV = 13
+		0,								// UCxBRF = 0
+		37,								// UCxBRS = 37
+		EUSCI_A_UART_NO_PARITY,
+		// No Parity
+		EUSCI_A_UART_LSB_FIRST,						   // MSB First
+		EUSCI_A_UART_ONE_STOP_BIT,					   // One stop bit
+		EUSCI_A_UART_MODE,							   // UART mode
+		EUSCI_A_UART_OVERSAMPLING_BAUDRATE_GENERATION, // Oversampling
+		EUSCI_A_UART_8_BIT_LEN						   // 8 bit data length
 };
 
 void _uartInit()
 {
 	/* Selecting P3.2 and P3.3 in UART mode */
 	GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P3,
-		GPIO_PIN2 | GPIO_PIN3,
-		GPIO_PRIMARY_MODULE_FUNCTION);
-	
+											   GPIO_PIN2 | GPIO_PIN3,
+											   GPIO_PRIMARY_MODULE_FUNCTION);
+
 	/* Setting DCO to 24MHz (upping Vcore) -> CPU operates at 24 MHz!*/
 	FlashCtl_setWaitState(FLASH_BANK0, 1);
 	FlashCtl_setWaitState(FLASH_BANK1, 1);
 	PCM_setCoreVoltageLevel(PCM_VCORE1);
-	//CS_setDCOCenteredFrequency(CS_DCO_FREQUENCY_24);
-	
+	// CS_setDCOCenteredFrequency(CS_DCO_FREQUENCY_24);
+
 	/* Configuring UART Module */
 	UART_initModule(EUSCI_A2_BASE, &uartConfig);
 
@@ -133,7 +140,7 @@ void _servoInit(void)
 
 	// Configure Tmer_A1 for the time measurement
 	upConfig.captureCompareInterruptEnable_CCR0_CCIE = TIMER_A_CCIE_CCR0_INTERRUPT_ENABLE; // Enable CCR0 interrupt
-	upConfig.timerPeriod *= 200; // 1 second
+	upConfig.timerPeriod *= 66;															   // 1 second
 	Timer_A_configureUpMode(TIMER_A1_BASE, &upConfig);
 
 	// Interrupt_enableSleepOnIsrExit();
@@ -154,14 +161,14 @@ void _adcInit()
 	 * with internal 2.5v reference */
 	ADC14_configureMultiSequenceMode(ADC_MEM0, ADC_MEM1, true);
 	ADC14_configureConversionMemory(ADC_MEM0,
-		ADC_VREFPOS_AVCC_VREFNEG_VSS,
-		ADC_INPUT_A15,
-		ADC_NONDIFFERENTIAL_INPUTS);
+									ADC_VREFPOS_AVCC_VREFNEG_VSS,
+									ADC_INPUT_A15,
+									ADC_NONDIFFERENTIAL_INPUTS);
 
 	ADC14_configureConversionMemory(ADC_MEM1,
-		ADC_VREFPOS_AVCC_VREFNEG_VSS,
-		ADC_INPUT_A9,
-		ADC_NONDIFFERENTIAL_INPUTS);
+									ADC_VREFPOS_AVCC_VREFNEG_VSS,
+									ADC_INPUT_A9,
+									ADC_NONDIFFERENTIAL_INPUTS);
 
 	/* Enabling the interrupt when a conversion on channel 1 (end of sequence)
 	 *  is complete and enabling conversions */
@@ -239,6 +246,7 @@ void changeServo2Direction()
 
 void pressTrigger()
 {
+	TA1_State = TA1_TRIGGER;
 	// Servo3 is releasing the trigger
 	servo3Direction = SERVOC_DOWN;
 	compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
@@ -271,30 +279,41 @@ int main(void)
 void TA1_0_IRQHandler(void)
 {
 	Timer_A_clearCaptureCompareInterrupt(TIMER_A1_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_0);
-
-	switch (triggerTimerCycles)
+	if (TA1_State == TA1_TRIGGER)
 	{
-	case TRIGGER_TIMER_MAX_CYCLES: // If the timer has reached the maximum cycles release the trigger
-		servo3Direction = SERVOC_UP;
-		compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
-		compareConfig_PWM.compareValue = servo3Direction;
-		Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+		switch (triggerTimerCycles)
+		{
+		case TRIGGER_TIMER_MAX_CYCLES: // If the timer has reached the maximum cycles release the trigger
+			servo3Direction = SERVOC_UP;
+			compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
+			compareConfig_PWM.compareValue = servo3Direction;
+			Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+			// Start the timer again
+			triggerTimerCycles--;
+			Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
+			break;
+		case 0:
+			servo3Direction = SERVOC_STOP;										   // If the timer has reached the minimum cycles stop the trigger
+			compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
+			compareConfig_PWM.compareValue = servo3Direction;
+			Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+			TA1_State = TA1_NO_MOVE;
+			break;
+		default:
+			// If the servo is pressing the trigger increase the triggerTimerCycles otherwise decrease it
+			triggerTimerCycles = triggerTimerCycles + (servo3Direction == SERVOC_DOWN ? 1 : -1);
+			// Start the timer again
+			Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
+			break;
+		}
+	}
+	else if (TA1_State == TA1_AUTO_MOVE)
+	{
+		servo2Direction = SERVOC_STOP;
+		changeServo2Direction();
 		// Start the timer again
-		triggerTimerCycles--;
-		Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
-		break;
-	case 0:
-		servo3Direction = SERVOC_STOP; // If the timer has reached the minimum cycles stop the trigger
-		compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
-		compareConfig_PWM.compareValue = servo3Direction;
-		Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
-		break;
-	default:
-		// If the servo is pressing the trigger increase the triggerTimerCycles otherwise decrease it
-		triggerTimerCycles = triggerTimerCycles + (servo3Direction == SERVOC_DOWN ? 1 : -1);
-		// Start the timer again
-		Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
-		break;
+		// Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
+		TA1_State = TA1_NO_MOVE;
 	}
 }
 
@@ -328,7 +347,7 @@ void ADC14_IRQHandler(void)
 		int topButtonPressed = 0;
 		if (!(P5IN & GPIO_PIN1))
 		{
-			topButtonPressed = 1;
+			turretAutomaticMode = false;
 		}
 
 		if (!turretAutomaticMode)
@@ -355,6 +374,8 @@ void ADC14_IRQHandler(void)
 			{
 				servo2Direction = SERVOC_DOWN;
 				changeServo2Direction();
+				TA1_State = TA1_AUTO_MOVE;
+				Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
 			}
 			else if (servo2Direction != SERVOC_STOP)
 			{
@@ -370,47 +391,45 @@ void ADC14_IRQHandler(void)
 			}
 		}
 
-		sprintf(debugPrintString, "Servo2: %d, %d", servo2Direction, triggerTimerCycles);
-
 		Graphics_drawStringCentered(&g_sContext,
-			debugPrintString,
-			AUTO_STRING_LENGTH,
-			64,
-			30,
-			OPAQUE_TEXT);
+									debugPrintString,
+									AUTO_STRING_LENGTH,
+									64,
+									30,
+									OPAQUE_TEXT);
 
 		char string[10];
 		sprintf(string, "X: %5d", resultsBuffer[0]);
 		Graphics_drawStringCentered(&g_sContext,
-			(int8_t *)string,
-			8,
-			64,
-			50,
-			OPAQUE_TEXT);
+									(int8_t *)string,
+									8,
+									64,
+									50,
+									OPAQUE_TEXT);
 
 		sprintf(string, "Y: %5d", resultsBuffer[1]);
 		Graphics_drawStringCentered(&g_sContext,
-			(int8_t *)string,
-			8,
-			64,
-			70,
-			OPAQUE_TEXT);
+									(int8_t *)string,
+									8,
+									64,
+									70,
+									OPAQUE_TEXT);
 
 		sprintf(string, "Top Button: %d", topButtonPressed);
 		Graphics_drawStringCentered(&g_sContext,
-			(int8_t *)string,
-			AUTO_STRING_LENGTH,
-			64,
-			90,
-			OPAQUE_TEXT);
+									(int8_t *)string,
+									AUTO_STRING_LENGTH,
+									64,
+									90,
+									OPAQUE_TEXT);
 
 		sprintf(string, "Bottom Button: %d", bottomButtonPressed);
 		Graphics_drawStringCentered(&g_sContext,
-			(int8_t *)string,
-			AUTO_STRING_LENGTH,
-			64,
-			110,
-			OPAQUE_TEXT);
+									(int8_t *)string,
+									AUTO_STRING_LENGTH,
+									64,
+									110,
+									OPAQUE_TEXT);
 	}
 }
 
@@ -420,61 +439,66 @@ void EUSCIA2_IRQHandler(void)
 {
 	uint32_t status = UART_getEnabledInterruptStatus(EUSCI_A2_BASE);
 
-	if (status & EUSCI_A_UART_RECEIVE_INTERRUPT_FLAG)
+	if (status & EUSCI_A_UART_RECEIVE_INTERRUPT_FLAG && turretAutomaticMode)
 	{
 		RXData = UART_receiveData(EUSCI_A2_BASE);
-		
+
 		char string[10];
 		sprintf(string, "UART: %d", RXData);
 		Graphics_drawStringCentered(&g_sContext,
-			(int8_t *)string,
-			AUTO_STRING_LENGTH,
-			64,
-			10,
-			OPAQUE_TEXT);
+									(int8_t *)string,
+									AUTO_STRING_LENGTH,
+									64,
+									10,
+									OPAQUE_TEXT);
+
+		servo2Direction = SERVOC_STOP;
+		changeServo2Direction();
 
 		switch (RXData)
 		{
-			// left
-			case 0:
-				if (servo1Position > SERVO1_MIN)
-				{
-					servo1Position = servo1Position - 20;
-					moveServo1();
-				}	
+		// left
+		case 1:
+			if (servo1Position > SERVO1_MIN)
+			{
+				servo1Position = servo1Position - 20;
+				moveServo1();
+			}
+			break;
+		// right
+		case 0:
+			if (servo1Position < SERVO1_MAX)
+			{
+				servo1Position = servo1Position + 20;
+				moveServo1();
+			}
+			break;
+		// up
+		case 3:
+			if (TA1_State == TA1_TRIGGER)
 				break;
-			// right
-			case 1:
-				if (servo1Position < SERVO1_MAX)
-				{
-					servo1Position = servo1Position + 20;
-					moveServo1();
-				}
+			servo2Direction = SERVOC_UP;
+			changeServo2Direction();
+			TA1_State = TA1_State;
+			Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
+			break;
+		// down
+		case 2:
+			if (TA1_State == TA1_TRIGGER)
 				break;
-			// up
-			case 2:
-				servo2Direction = SERVOC_UP;
-				changeServo2Direction();
+			servo2Direction = SERVOC_DOWN;
+			changeServo2Direction();
+			TA1_State = TA1_AUTO_MOVE;
+			Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
+			break;
+		// centered
+		case 4:
+			if (TA1_State == TA1_NO_MOVE)
 				break;
-			// down
-			case 3:
-				servo2Direction = SERVOC_DOWN;
-				changeServo2Direction();
-				break;
-			// centered
-			case 4:
-				servo2Direction = SERVOC_STOP;
-				changeServo2Direction();
-				pressTrigger();
-				break;
-			// can't see target
-			case 5:
-				servo2Direction = SERVOC_STOP;
-				changeServo2Direction();
-				break;
+			pressTrigger();
+			break;
 		}
-		
+
 		Interrupt_disableSleepOnIsrExit();
 	}
-
 }

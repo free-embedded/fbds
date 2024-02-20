@@ -68,3 +68,8 @@ dkms.conf
 settings.json
 
 examples/*
+
+bin/*
+lib/*
+pyvenv.cfg
+lib64
