@@ -16,14 +16,14 @@ Timer_A_CompareModeConfig compareConfig_PWM_buzzer = {
         TIMER_A_CAPTURECOMPARE_REGISTER_4,          // Use CCR3
         TIMER_A_CAPTURECOMPARE_INTERRUPT_DISABLE,   // Disable CCR interrupt
         TIMER_A_OUTPUTMODE_TOGGLE_SET,              // Toggle output but
-        61500,                                      // 25% Duty Cycle initially
+        14000,                                      // 25% Duty Cycle initially
 };
 
 /* Timer_A Up Configuration Parameter */
 Timer_A_UpModeConfig upConfig_buzzer = {
         TIMER_A_CLOCKSOURCE_SMCLK,              // SMCLK = 3 MhZ
-        TIMER_A_CLOCKSOURCE_DIVIDER_12,         // SMCLK/12 = 250 KhZ
-        62500,                                  // 40 ms tick period
+        TIMER_A_CLOCKSOURCE_DIVIDER_64,         // SMCLK/12 = 250 KhZ
+        15000,                                  // 40 ms tick period
         TIMER_A_TAIE_INTERRUPT_DISABLE,         // Disable Timer interrupt
         TIMER_A_CCIE_CCR0_INTERRUPT_DISABLE,    // Disable CCR0 interrupt
         TIMER_A_DO_CLEAR                        // Clear value

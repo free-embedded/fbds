@@ -35,7 +35,7 @@ Graphics_Context g_sContext;
 #define SERVO1_MIN 450
 #define SERVO1_MID 1100
 
-#define SERVO1_MOVE 100
+#define SERVO1_MOVE 50
 
 int servo1Position = SERVO1_MID;
 
@@ -161,8 +161,10 @@ void _graphicsInit() {
     // Set default screen orientation
     Crystalfontz128x128_SetOrientation(LCD_ORIENTATION_UP);
 
-    // Initializes graphics context
+    /* Initializes graphics context */
     Graphics_initContext(&g_sContext, &g_sCrystalfontz128x128, &g_sCrystalfontz128x128_funcs);
+    Graphics_setForegroundColor(&g_sContext, GRAPHICS_COLOR_RED);
+    Graphics_setBackgroundColor(&g_sContext, GRAPHICS_COLOR_WHITE);
     GrContextFontSet(&g_sContext, &g_sFontFixed6x8);
     Graphics_clearDisplay(&g_sContext);
 
@@ -190,8 +192,8 @@ void _hwInit() {
 
     _graphicsInit();
     _adcInit();
+    // _toneInit();
     _servoInit();
-    _toneInit();
 }
 
 // Function to move the servo1 to the desired position
@@ -335,22 +337,22 @@ void ADC14_IRQHandler(void) {
             uint16_t y_offset = 128 - map(resultsBuffer[1], 0, JOYSTICK_MAX_VALUE, 0, 128); // invert y axis
 
             // redraw the image
-            Graphics_drawImage(&g_sContext, &orso8BPP_UNCOMP, 0, 0);
+            // Graphics_drawImage(&g_sContext, &orso8BPP_UNCOMP, 0, 0);
 
             // draw cross
             // horizontal lines
-            Graphics_drawLineH(&g_sContext, x_offset - 20, x_offset + 20, y_offset - 1);
-            Graphics_drawLineH(&g_sContext, x_offset - 20, x_offset + 20, y_offset);
-            Graphics_drawLineH(&g_sContext, x_offset - 20, x_offset + 20, y_offset + 1);
+            // Graphics_drawLineH(&g_sContext, x_offset - 20, x_offset + 20, y_offset - 1);
+            // Graphics_drawLineH(&g_sContext, x_offset - 20, x_offset + 20, y_offset);
+            // Graphics_drawLineH(&g_sContext, x_offset - 20, x_offset + 20, y_offset + 1);
 
             // vertical lines
-            Graphics_drawLineV(&g_sContext, x_offset - 1, y_offset - 20, y_offset + 20);
-            Graphics_drawLineV(&g_sContext, x_offset, y_offset - 20, y_offset + 20);
-            Graphics_drawLineV(&g_sContext, x_offset + 1, y_offset - 20, y_offset + 20);
+            // Graphics_drawLineV(&g_sContext, x_offset - 1, y_offset - 20, y_offset + 20);
+            // Graphics_drawLineV(&g_sContext, x_offset, y_offset - 20, y_offset + 20);
+            // Graphics_drawLineV(&g_sContext, x_offset + 1, y_offset - 20, y_offset + 20);
 
             // draw circles
-            Graphics_drawCircle(&g_sContext, x_offset, y_offset, 15);
-            Graphics_drawCircle(&g_sContext, x_offset, y_offset, 16);
+            // Graphics_drawCircle(&g_sContext, x_offset, y_offset, 15);
+            // Graphics_drawCircle(&g_sContext, x_offset, y_offset, 16);
         }
     }
 }
