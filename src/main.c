@@ -26,6 +26,9 @@ Graphics_Context g_sContext;
 #define map(x, in_min, in_max, out_min, out_max) \
     ((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
+#define delta_percent(value, previus_value) \
+    ((value - previus_value) * 100 / joystick_max_value)
+
 // SERVO1 (HORIZONTAL) 2.5
 #define SERVO1_MAX 1800
 #define SERVO1_MIN 450
@@ -213,15 +216,6 @@ void pressTrigger() {
     Timer_A_startCounter(TIMER_A1_BASE, TIMER_A_UP_MODE);
 }
 
-
-uint16_t map_value(uint16_t value, uint16_t from_min, uint16_t from_max, uint16_t to_min, uint16_t to_max) {
-    return (value - from_min) * (to_max - to_min) / (from_max - from_min) + to_min;
-}
-
-uint16_t percent_delta(uint16_t value, uint16_t previus_value) {
-    return (value - previus_value) * 100 / joystick_max_value;
-}
-
 int main(void) {
     _hwInit();
     play_song(hedwigsTheme);
@@ -325,16 +319,16 @@ void ADC14_IRQHandler(void) {
 
 
         // if the delta is huge, redraw the image. This is to avoid flickering5
-        if (percent_delta(resultsBuffer[0], previusResultsBuffer[0]) > 7 || previusResultsBuffer[0] == 0 ||
-            percent_delta(resultsBuffer[1], previusResultsBuffer[1]) > 7 || previusResultsBuffer[1] == 0) {
+        if (delta_percent(resultsBuffer[0], previusResultsBuffer[0]) > 7 || previusResultsBuffer[0] == 0 ||
+            delta_percent(resultsBuffer[1], previusResultsBuffer[1]) > 7 || previusResultsBuffer[1] == 0) {
             previusResultsBuffer[0] = resultsBuffer[0];
             previusResultsBuffer[1] = resultsBuffer[1];
 
             // draw sight (circle + cross)
 
             // map the joystick values to the screen
-            uint16_t x_offset = map_value(resultsBuffer[0], 0, joystick_max_value, 0, 128);
-            uint16_t y_offset = 128 - map_value(resultsBuffer[1], 0, joystick_max_value, 0, 128); // invert y axis
+            uint16_t x_offset = map(resultsBuffer[0], 0, joystick_max_value, 0, 128);
+            uint16_t y_offset = 128 - map(resultsBuffer[1], 0, joystick_max_value, 0, 128); // invert y axis
 
             // redraw the image
             Graphics_drawImage(&g_sContext, &orso8BPP_UNCOMP, 0, 0);
