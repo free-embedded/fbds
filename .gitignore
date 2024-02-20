@@ -1,7 +1,3 @@
-# ifgnore venv files and folders
-pyvenv.cfg
-venv
-
 # MacOS
 .DS_store
 
@@ -72,3 +68,8 @@ dkms.conf
 settings.json
 
 examples/*
+
+bin/*
+lib/*
+pyvenv.cfg
+lib64
