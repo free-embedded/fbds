@@ -7,7 +7,7 @@ CC = "$(GCC_ARMCOMPILER)/bin/arm-none-eabi-gcc"
 LNK = "$(GCC_ARMCOMPILER)/bin/arm-none-eabi-gcc"
 
 OBJECTS = ./target/main.obj ./target/system_msp432p401r.obj ./target/gcc_startup_msp432p401r_gcc.obj \
-          ./target/Crystalfontz128x128_ST7735.obj ./target/HAL_MSP_EXP432P401R_Crystalfontz128x128_ST7735.obj
+          ./target/Crystalfontz128x128_ST7735.obj ./target/HAL_MSP_EXP432P401R_Crystalfontz128x128_ST7735.obj ./target/orso.obj
 
 NAME = ./out/fbds
 
@@ -54,6 +54,11 @@ LFLAGS = -Wl,-T,./build/msp432p401r.lds \
     --specs=nano.specs
 
 all: $(NAME).out
+
+./target/orso.obj: ./src/orso.c
+	$(DIR_GUARD)
+	@ echo Building $@
+	@ $(CC) $(CFLAGS) $< -c -o $@
 
 ./target/Crystalfontz128x128_ST7735.obj: ./src/LcdDriver/Crystalfontz128x128_ST7735.c
 	$(DIR_GUARD) # Ensure this line starts with a tab, not spaces

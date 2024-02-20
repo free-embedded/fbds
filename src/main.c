@@ -7,6 +7,9 @@
 /* Graphic library context */
 Graphics_Context g_sContext;
 
+
+extern Graphics_Image orso8BPP_UNCOMP;
+
 /* ADC results buffer */
 static uint16_t resultsBuffer[2];
 
@@ -201,6 +204,8 @@ void _graphicsInit()
     Graphics_setBackgroundColor(&g_sContext, GRAPHICS_COLOR_WHITE);
     GrContextFontSet(&g_sContext, &g_sFontFixed6x8);
     Graphics_clearDisplay(&g_sContext);
+
+    Graphics_drawImage(&g_sContext, &orso8BPP_UNCOMP, 0, 0);
 }
 
 void _hwInit()
