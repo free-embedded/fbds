@@ -17,6 +17,7 @@ This was a group project for the _Embedded Software for the Internet of Things_ 
   - [How to Use](#how-to-use)
   - [Project Presentation](#project-presentation)
   - [Team Contributions](#team-contributions)
+  - [Credits](#credits)
 
 ## Hardware Requirements
 - MSP432P401R (TI)
@@ -86,6 +87,11 @@ The system will start in automatic mode. Press the top button to switch to manua
 | Buzzer Music      | Marco Toniolo            |
 | LCD Display       | Marco Toniolo            |
 | Makefile          | Marco Toniolo            |
+
+## Credits
+- University of Trento's FabLab for providing most hardware and materials required for the project
+- Contradius on Thingiverse for the Nerf turret model
+- Walter Newsome for image to `.c` file converter
 
 ![Bear riding a rocket](https://github.com/davidepaci/fbds/assets/23656588/97df4885-5722-4dcb-8542-59ddd7192674)
 ![Chad bear](https://github.com/davidepaci/fbds/assets/23656588/11ce18b9-2380-4eb8-9651-2d43b3532342)
