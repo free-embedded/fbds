@@ -4,7 +4,9 @@
 The Flying Bear Defense System (FBDS) consists of a fully controllable turret made of a TI MSP432P401R Launchpad, a TI Booster Pack MK II, 3 servos, a pan-and-tilt turret and a Nerf blaster.
 It also features an automatic mode via a webcam mounted on it, powered by OpenCV. Said program tracks an ArUco marker and tells an ESP32 which direction to move to, which in turn forwards said direction to the MSP432P401R.
 
-This was a group project for the _Embedded Software for the Internet of Things_ course at University of Trento.
+This was a group project for the _Embedded Software for the Internet of Things_ course at University of Trento by Simone De Carli, Mattia Maci, Davide José Paci, Marco Toniolo.
+
+![Untitled video - Made with Clipchamp](https://github.com/free-embedded/fbds/assets/23656588/f08558a5-40af-4749-b33c-34e40582bf6b)
 
 ![Removal-438](https://github.com/free-embedded/fbds/assets/23656588/b18a7514-447f-408d-ae5a-e0ea6fe7d8b8)
 
@@ -70,6 +72,7 @@ In another terminal (preferably in the project folder, so the paths are shorter)
 The system will start in automatic mode. Press the top button to switch to manual mode. In manual mode, use the joystick to control the turret on both axes and press the bottom button to shoot the dart.
 
 ## [Project Presentation](https://www.canva.com/design/DAF9WZTbPrw/5qKn4lTqf2faBvDL3ldvow/edit?utm_content=DAF9WZTbPrw&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
+## [Project Video](https://youtu.be/_ldBu4AE92Y)
 
 ## Team Contributions
 | Task              | Contributors             |
@@ -82,6 +85,7 @@ The system will start in automatic mode. Press the top button to switch to manua
 | Project Video     | Mattia Maci              |
 | Automatic Mode    | Davide José Paci         |
 | Project Outline   | Davide José Paci         |
+| Project Presentation | Davide José Paci      |
 | Project README    | Davide José Paci         |
 | UART              | Davide José Paci         |
 | Buzzer Music      | Marco Toniolo            |
