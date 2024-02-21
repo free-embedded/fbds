@@ -29,6 +29,7 @@ This was a group project for the _Embedded Software for the Internet of Things_ 
 - Pan and Tilt Turret
 - Breadboard
 - ESP32
+- 3D-printed [Nerf Jolt tilt-pan turret](https://www.thingiverse.com/thing:3962317)
 - Webcam for target detection
 
 ## Software Involved
