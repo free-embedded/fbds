@@ -4,11 +4,19 @@
 #include "LcdDriver/Crystalfontz128x128_ST7735.h"
 #include <stdio.h>
 
+#include <stdint.h>
+#include "notes.h"
+#include "song.h"
+#include "player.h"
+
 /* Graphic library context */
 Graphics_Context g_sContext;
 
+extern Song hedwigsTheme; // Declare external reference to the song defined elsewhere
 
 extern Graphics_Image orso8BPP_UNCOMP;
+
+uint8_t endGame = false;
 
 /* ADC results buffer */
 static uint16_t resultsBuffer[2];
@@ -37,7 +45,7 @@ int servo3Direction = SERVOC_STOP;
 #define TRIGGER_TIMER_MAX_CYCLES 10
 uint8_t triggerTimerCycles = 0;
 
-int turretAutomaticMode = true;
+uint8_t turretAutomaticMode = true;
 
 #define JOYSTICK_TRESHOLD 2500
 #define JOYSTICK_CENTER 8192
@@ -321,6 +329,11 @@ void TA1_0_IRQHandler(void)
     }
 }
 
+uint16_t map_value(uint16_t value, uint16_t from_min, uint16_t from_max, uint16_t to_min, uint16_t to_max)
+{
+    return (value - from_min) * (to_max - to_min) / (from_max - from_min) + to_min;
+}
+
 /*
  * This interrupt is fired whenever a conversion is completed and placed in
  * ADC_MEM1. This signals the end of conversion and the results array is
@@ -333,21 +346,64 @@ void ADC14_IRQHandler(void)
     status = ADC14_getEnabledInterruptStatus();
     ADC14_clearInterruptFlag(status);
 
+    if (endGame)
+    {
+        return;
+    }
+
     /* ADC_MEM1 conversion completed */
-    if (status & ADC_INT1)
+    if (status & ADC_INT1 && !endGame)
     {
         /* Store ADC14 conversion results */
         resultsBuffer[0] = ADC14_getResult(ADC_MEM0);
         resultsBuffer[1] = ADC14_getResult(ADC_MEM1);
 
-        // Determine if JoyStick bottom button is pressed
+        /* Determine if JoyStick button is pressed */
+        if (!(P4IN & GPIO_PIN1))
+        {
+            endGame = true;
+
+            servo1Position = 0;
+            servo2Direction = 0;
+            servo3Direction = 0;
+            moveServo1();
+            changeServo2Direction();
+            compareConfig_PWM.compareRegister = TIMER_A_CAPTURECOMPARE_REGISTER_3; // For P2.6
+            compareConfig_PWM.compareValue = servo3Direction;
+            Timer_A_initCompare(TIMER_A0_BASE, &compareConfig_PWM);
+
+            _toneInit();
+            // redraw the image
+            Graphics_drawImage(&g_sContext, &orso8BPP_UNCOMP, 0, 0);
+
+            uint8_t x_offset = 64;
+            uint8_t y_offset = 64;
+
+            // draw cross
+            // horizontal
+            Graphics_drawLineH(&g_sContext, x_offset - 20, x_offset + 20, y_offset - 1);
+            Graphics_drawLineH(&g_sContext, x_offset - 20, x_offset + 20, y_offset);
+            Graphics_drawLineH(&g_sContext, x_offset - 20, x_offset + 20, y_offset + 1);
+
+            // vertical
+            Graphics_drawLineV(&g_sContext, x_offset - 1, y_offset - 20, y_offset + 20);
+            Graphics_drawLineV(&g_sContext, x_offset, y_offset - 20, y_offset + 20);
+            Graphics_drawLineV(&g_sContext, x_offset + 1, y_offset - 20, y_offset + 20);
+
+            // draw circle
+            Graphics_drawCircle(&g_sContext, x_offset, y_offset, 15);
+            Graphics_drawCircle(&g_sContext, x_offset, y_offset, 16);
+            play_song(hedwigsTheme);
+        }
+
+        // Determine if boosterpack bottom button is pressed
         int bottomButtonPressed = 0;
         if (!(P3IN & GPIO_PIN5))
         {
             bottomButtonPressed = 1;
         }
 
-        // Determine if JoyStick top button is pressed
+        // Determine if boosterpack top button is pressed
         int topButtonPressed = 0;
         if (!(P5IN & GPIO_PIN1))
         {
@@ -420,7 +476,6 @@ void ADC14_IRQHandler(void)
                                     64,
                                     70,
                                     OPAQUE_TEXT);
-
 
         if (turretAutomaticMode)
         {
@@ -501,7 +556,6 @@ void EUSCIA2_IRQHandler(void)
             pressTrigger();
             break;
         }
-
 
         for (int i = 0; i < 100000; i++)
             ;

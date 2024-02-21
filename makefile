@@ -7,7 +7,8 @@ CC = "$(GCC_ARMCOMPILER)/bin/arm-none-eabi-gcc"
 LNK = "$(GCC_ARMCOMPILER)/bin/arm-none-eabi-gcc"
 
 OBJECTS = ./target/main.obj ./target/system_msp432p401r.obj ./target/gcc_startup_msp432p401r_gcc.obj \
-          ./target/Crystalfontz128x128_ST7735.obj ./target/HAL_MSP_EXP432P401R_Crystalfontz128x128_ST7735.obj ./target/orso.obj
+          ./target/Crystalfontz128x128_ST7735.obj ./target/HAL_MSP_EXP432P401R_Crystalfontz128x128_ST7735.obj \
+		  ./target/orso.obj ./target/player.obj ./target/hedwings_theme.obj 
 
 NAME = ./out/fbds
 
@@ -55,6 +56,16 @@ LFLAGS = -Wl,-T,./build/msp432p401r.lds \
 
 all: $(NAME).out
 
+./target/hedwings_theme.obj: ./src/hedwings_theme.c
+	$(DIR_GUARD)
+	@ echo Building $@
+	@ $(CC) $(CFLAGS) $< -c -o $@
+
+./target/player.obj: ./src/player.c
+	$(DIR_GUARD)
+	@ echo Building $@
+	@ $(CC) $(CFLAGS) $< -c -o $@
+	
 ./target/orso.obj: ./src/orso.c
 	$(DIR_GUARD)
 	@ echo Building $@
