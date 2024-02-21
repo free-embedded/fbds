@@ -14,7 +14,7 @@ aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_100)
 parameters =  aruco.DetectorParameters()
 
 # Initialize the video capture
-cap = cv2.VideoCapture(2)
+cap = cv2.VideoCapture(0)
 
 # Define the width and height of the camera frame
 width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
